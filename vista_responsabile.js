@@ -108,6 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
   // 2. Pannello Superadmin (Solo AgoGio)
+  let recentlyUpdatedRoles = new Set();
+  
   function initSuperadminPanel() {
       const qU = query(collection(db, "utenti"));
       onSnapshot(qU, (snapshot) => {
@@ -120,9 +122,35 @@ document.addEventListener('DOMContentLoaded', () => {
               const isAdmin = !!u.is_admin;
               const badge = isAdmin ? `<span class="badge" style="background:rgba(57,255,20,0.1); border:1px solid var(--neon-green); color:var(--neon-green);">Admin</span>` : `<span class="badge" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:var(--text-muted);">Utente</span>`;
               
+              const isSuperAdmin = currentAdminUser && currentAdminUser.superadmin;
+              const currentRuolo = u.ruolo || ''; 
+              const roleOptions = [
+                  { val: '', text: '--- Seleziona Ruolo ---' },
+                  { val: 'superadmin', text: 'Superadmin / Presidente' },
+                  { val: 'admin', text: 'Amministratore / Segreteria' },
+                  { val: 'autista', text: 'Autista (AUT)' },
+                  { val: 'caposquadra', text: 'Caposquadra / Riferimento (RIF)' },
+                  { val: 'soccorritore', text: 'Soccorritore (SOC)' },
+                  { val: 'allievo', text: 'Allievo / Milite in Prova' },
+                  { val: 'kiosk', text: 'Schermo / Monitor Sede' }
+              ];
+              const optionsHtml = roleOptions.map(opt => `<option value="${opt.val}" ${currentRuolo === opt.val ? 'selected' : ''}>${opt.text}</option>`).join('');
+              
+              const isRecentlyUpdated = recentlyUpdatedRoles.has(u.matricola);
+              const extraStyles = isRecentlyUpdated ? 'border-color: var(--neon-green); box-shadow: 0 0 8px var(--neon-green);' : 'border-color: rgba(255,255,255,0.2);';
+              
+              const selectHtml = `<select class="role-select" data-matricola="${u.matricola}" ${!isSuperAdmin ? 'disabled' : ''} style="background: rgba(0,0,0,0.3); color: var(--text-main); padding: 0.3rem; border-radius: 4px; font-size: 0.8rem; margin-left: 0.5rem; outline: none; transition: all 0.3s ease; border: 1px solid transparent; ${extraStyles}">
+                  ${optionsHtml}
+              </select>`;
+              
               tr.innerHTML = `
                   <td>${u.matricola}</td>
-                  <td>${formattaNominativoUtente(u)}</td>
+                  <td>
+                      <div style="display:flex; align-items:center;">
+                          <span>${formattaNominativoUtente(u)}</span>
+                          ${selectHtml}
+                      </div>
+                  </td>
                   <td style="font-size:0.8rem; color:var(--text-muted);">${(u.ruoli_areu || []).join(', ')}</td>
                   <td>${badge}</td>
                   <td>
@@ -142,6 +170,37 @@ document.addEventListener('DOMContentLoaded', () => {
                       await updateDoc(doc(db, "utenti", targetMatricola), { is_admin: !currentStatus });
                   } catch(err) {
                       console.error("Errore modifica permessi admin", err);
+                  }
+              });
+          });
+          
+          document.querySelectorAll('.role-select').forEach(select => {
+              select.addEventListener('change', async (e) => {
+                  const targetMatricola = e.currentTarget.getAttribute('data-matricola');
+                  const newRole = e.currentTarget.value;
+                  
+                  e.currentTarget.style.opacity = '0.5';
+                  e.currentTarget.style.pointerEvents = 'none';
+                  
+                  try {
+                      recentlyUpdatedRoles.add(targetMatricola);
+                      await updateDoc(doc(db, "utenti", targetMatricola), { ruolo: newRole });
+                      
+                      setTimeout(() => {
+                          recentlyUpdatedRoles.delete(targetMatricola);
+                          const updatedSelect = document.querySelector(`.role-select[data-matricola="${targetMatricola}"]`);
+                          if(updatedSelect) {
+                              updatedSelect.style.borderColor = 'rgba(255,255,255,0.2)';
+                              updatedSelect.style.boxShadow = 'none';
+                          }
+                      }, 2000);
+                      
+                  } catch(err) {
+                      console.error("Errore modifica ruolo", err);
+                      alert("Errore durante il salvataggio del ruolo.");
+                      recentlyUpdatedRoles.delete(targetMatricola);
+                      e.currentTarget.style.opacity = '1';
+                      e.currentTarget.style.pointerEvents = 'auto';
                   }
               });
           });
