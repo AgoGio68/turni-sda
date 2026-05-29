@@ -1,0 +1,4 @@
+node_modules/
+.firebase/
+turni-sda-firebase-adminsdk-*.json
+serviceAccountKey.json

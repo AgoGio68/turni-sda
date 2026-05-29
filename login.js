@@ -58,12 +58,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    const matricola = rawMatricola.trim();
+    // 1. Trim dell'input e normalizzazione (es. 34 -> 034)
+    let matricola = rawMatricola.trim();
+    if (!isNaN(matricola) && matricola !== '' && matricola.length < 3) {
+      matricola = matricola.padStart(3, '0');
+    }
 
     errorMsg.textContent = "Autenticazione in corso...";
     btnLogin.disabled = true;
 
-    // Se admin supremo AgoGio bypassa l'email fittizia .local (nel caso l'override non scatti)
+    // 2. Costruzione e-mail
     const email = matricola.toLowerCase() === 'agogio' ? 'agogio@turni-sda.local' : `${matricola}@turni-sda.local`;
 
     // Intercettazione A MONTE dell'autenticazione per l'account speciale AgoGio

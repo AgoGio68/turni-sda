@@ -4,8 +4,8 @@ import { getFirestore } from 'firebase-admin/firestore';
 import fs from 'fs';
 
 // Assicurati di avere il file serviceAccountKey.json nella stessa cartella 
-// (puoi generarlo dalle impostazioni del progetto in Firebase Console > Account di servizio)
-const serviceAccount = JSON.parse(fs.readFileSync('./serviceAccountKey.json', 'utf8'));
+// (puoi generarlo dalle// ATTENZIONE: Il file scaricato è stato riconosciuto automaticamente.
+const serviceAccount = JSON.parse(fs.readFileSync('./turni-sda-firebase-adminsdk-fbsvc-7aa3fc5b70.json', 'utf8'));
 
 initializeApp({
   credential: cert(serviceAccount)
@@ -27,7 +27,11 @@ async function creaAccountAuth() {
       const email = `${matricola}@turni-sda.local`;
       
       try {
-        await auth.getUserByEmail(email);
+        const userRecord = await auth.getUserByEmail(email);
+        // L'account esiste già, forziamo l'aggiornamento della password
+        await auth.updateUser(userRecord.uid, { password: 'soccorso2026' });
+        creati++;
+        console.log(`Reset password completato per matricola ${matricola} (${email})`);
       } catch (error) {
         if (error.code === 'auth/user-not-found') {
           try {
@@ -48,7 +52,7 @@ async function creaAccountAuth() {
       }
     }
     
-    console.log(`Allineamento terminato con successo. Creati ${creati} nuovi account Auth.`);
+    console.log(`Allineamento terminato con successo. Processati ${creati} account Auth.`);
     process.exit(0);
   } catch (err) {
     console.error("Errore irreversibile durante la lettura da Firestore:", err);
