@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const nuovoMembro = {
                 matricola: currentUser.matricola,
-                nominativo: `${currentUser.nome} ${currentUser.cognome}`,
+                nominativo: formattaNominativoUtente(currentUser),
                 convalidato_da_admin: false
             };
 

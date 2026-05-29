@@ -12,7 +12,8 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 */
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, query, onSnapshot, writeBatch, doc, getDoc, updateDoc } from "firebase/firestore";
+import { getFirestore, collection, getDocs, updateDoc, doc, onSnapshot, query, writeBatch, getDoc } from "firebase/firestore";
+import { formattaNominativoUtente, ordinaUtentiAlfabetico } from './utils.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -87,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const snap = await getDoc(doc(db, "utenti", matricola));
             if (snap.exists() && snap.data().is_admin) {
                 currentAdminUser = snap.data();
-                adminInfo.innerHTML = `Admin: ${currentAdminUser.nome} ${currentAdminUser.cognome} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
+                adminInfo.innerHTML = `Admin: ${formattaNominativoUtente(currentAdminUser)} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
                 document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
                 
                 superadminSection.style.display = 'none'; // Nascosto
@@ -111,7 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const qU = query(collection(db, "utenti"));
       onSnapshot(qU, (snapshot) => {
           superadminTbody.innerHTML = '';
-          const users = snapshot.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.cognome||'').localeCompare(b.cognome||''));
+          let users = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
+          users = ordinaUtentiAlfabetico(users);
           
           users.forEach(u => {
               const tr = document.createElement('tr');
@@ -120,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
               
               tr.innerHTML = `
                   <td>${u.matricola}</td>
-                  <td>${u.nome} ${u.cognome}</td>
+                  <td>${formattaNominativoUtente(u)}</td>
                   <td style="font-size:0.8rem; color:var(--text-muted);">${(u.ruoli_areu || []).join(', ')}</td>
                   <td>${badge}</td>
                   <td>
