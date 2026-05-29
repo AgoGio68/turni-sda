@@ -36,6 +36,7 @@ try {
 let modificheSospese = []; 
 let turniOriginali = new Map();
 let currentAdminUser = null;
+let recentlyUpdatedRoles = new Set();
 
 const stagingBar = document.getElementById('staging-bar');
 const stagingCount = document.getElementById('staging-count');
@@ -117,7 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   
   // 2. Pannello Superadmin (Solo AgoGio)
-  let recentlyUpdatedRoles = new Set();
   
   function initSuperadminPanel() {
       const qU = query(collection(db, "utenti"));
