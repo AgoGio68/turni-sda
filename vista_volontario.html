@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turni SDA - Calendario Macro/Micro</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Stili Livello Macro & Micro (Glassmorphism 2.0) */
+    .micro-bars {
+      display: flex; flex-direction: column; gap: 4px; width: 100%; margin-top: auto; padding-top: 15px;
+    }
+    .micro-bar {
+      height: 4px; border-radius: 2px; background: rgba(255,255,255,0.05); width: 100%; display: flex;
+    }
+    .micro-bar.verde { background: var(--neon-green); box-shadow: 0 0 5px var(--neon-green); }
+    .micro-bar.giallo { background: var(--neon-orange); box-shadow: 0 0 5px var(--neon-orange); }
+    .micro-bar.rosso { background: var(--neon-red); box-shadow: 0 0 5px var(--neon-red); }
+    .micro-bar-label { font-size: 0.55rem; color: var(--text-muted); margin-bottom: -3px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;}
+
+    /* Bottom Sheet Layout */
+    .bottom-sheet {
+      position: fixed; bottom: 0; left: 0; right: 0; max-height: 85vh; overflow-y: auto;
+      background: rgba(11, 15, 25, 0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+      border-top: 1px solid var(--border-glass); border-radius: 24px 24px 0 0;
+      padding: 2rem 1.5rem; box-shadow: 0 -10px 50px rgba(0,0,0,0.8);
+      transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); z-index: 2000;
+    }
+    .bottom-sheet.active { transform: translateY(0); }
+    .bs-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 1999;
+    }
+    .bs-overlay.active { opacity: 1; pointer-events: all; }
+    
+    .shift-card {
+      background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: var(--radius);
+      padding: 1.5rem; margin-bottom: 1.5rem;
+    }
+    .shift-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem; margin-bottom: 1rem; }
+    .slot-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px dashed rgba(255,255,255,0.05); }
+    .slot-row:last-child { border-bottom: none; }
+    .slot-info { display: flex; align-items: center; gap: 0.75rem; }
+    .slot-icon { font-size: 1.5rem; }
+    
+    .status-badge { font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px; letter-spacing: 0.5px;}
+    .status-conv { color: var(--neon-green); background: rgba(57, 255, 20, 0.05); border: 1px solid var(--neon-green); }
+    .status-wait { color: #38bdf8; background: rgba(56, 189, 248, 0.05); border: 1px solid #38bdf8; }
+    
+    .btn-take { padding: 0.5rem 1rem; font-size: 0.8rem; box-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📅 I Miei Turni (Macro & Micro)</h1>
+    <div id="user-info" style="font-weight: 500;">Profilo: Caricamento...</div>
+  </header>
+
+  <main class="container">
+    <div class="glass-panel" style="padding: 1.5rem;">
+      <h2 style="font-size: 1.25rem;">Calendario Mensile</h2>
+      <div class="calendar-grid" id="calendar">
+        <!-- Generato via Firestore -->
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Sheet Overlay & Container -->
+  <div class="bs-overlay" id="bs-overlay"></div>
+  <div class="bottom-sheet" id="bottom-sheet">
+    <div style="width: 50px; height: 5px; background: rgba(255,255,255,0.2); border-radius: 3px; margin: 0 auto 2rem auto;"></div>
+    <h2 id="bs-title" style="margin-top: 0; color: var(--text-main); font-size: 1.5rem;">Turni del Giorno</h2>
+    <div id="bs-content">
+      <!-- Generato via Firestore (Micro Livello) -->
+    </div>
+  </div>
+
+  <script type="module" src="vista_volontario.js"></script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turni SDA - Login</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .login-container {
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+    .input-field {
+      width: 100%;
+      padding: 1rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-glass);
+      background: rgba(255,255,255,0.05);
+      color: var(--text-main);
+      font-size: 1rem;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .input-field:focus {
+      border-color: var(--primary-neon);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    }
+    
+    /* Modal Cambio Password */
+    .pw-modal-overlay {
+      position: fixed; top:0; left:0; right:0; bottom:0;
+      background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .pw-modal-overlay.active { opacity: 1; pointer-events: all; }
+    .pw-modal-box {
+      width: 100%; max-width: 350px; background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--neon-orange); border-radius: 16px; padding: 2rem;
+      text-align: center; box-shadow: 0 0 30px rgba(255, 126, 103, 0.3);
+    }
+    .version-footer {
+      position: absolute; bottom: 1rem; color: var(--text-muted); font-size: 0.85rem; font-weight: 600; letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container glass-panel">
+    <h1 style="color: var(--primary-neon); margin:0;">🚨 Turni SDA</h1>
+    <p style="color: var(--text-muted); margin-top: 0.5rem;">Accesso Volontari e Operatori</p>
+    
+    <div class="login-form">
+      <div>
+        <input type="text" id="matricola" class="input-field" placeholder="Matricola (es. 123)" required>
+      </div>
+      <div>
+        <input type="password" id="password" class="input-field" placeholder="Password" required>
+      </div>
+      <button class="btn" id="btn-login" style="width: 100%; padding: 1rem; font-size: 1.1rem;">Accedi al Sistema</button>
+      <p id="login-error" style="color: var(--neon-red); font-size: 0.85rem; height: 1rem;"></p>
+    </div>
+  </div>
+
+  <div class="version-footer" id="version-text">Ver. ---</div>
+
+  <!-- Modal Cambio Password Obbligatorio -->
+  <div class="pw-modal-overlay" id="pw-modal">
+    <div class="pw-modal-box">
+      <h2 style="color: var(--neon-orange); margin-top:0;">Cambio Password Richiesto</h2>
+      <p style="color: var(--text-main); font-size: 0.9rem; margin-bottom: 1.5rem;">Hai effettuato l'accesso con la password di sistema temporanea. Scegli una nuova password per continuare.</p>
+      <input type="password" id="new-password" class="input-field" style="margin-bottom: 1rem;" placeholder="Nuova Password (min. 6 car.)">
+      <button class="btn" id="btn-save-pw" style="width: 100%; border-color: var(--neon-orange); color: var(--neon-orange);">Salva e Continua</button>
+      <p id="pw-error" style="color: var(--neon-red); font-size: 0.85rem; margin-top: 0.5rem;"></p>
+    </div>
+  </div>
+
+  <script type="module" src="login.js"></script>
+</body>
+</html>

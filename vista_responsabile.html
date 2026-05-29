@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turni SDA - Dashboard Responsabile</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>⚙️ Gestione Turni & Equipaggi</h1>
+    <div id="admin-info" style="font-weight: 500; color: var(--primary-neon);">Admin: Autenticazione in corso...</div>
+  </header>
+
+  <main class="container" style="max-width: 1400px;">
+    
+    <!-- SEZIONE SUPERADMIN -->
+    <div class="glass-panel" id="superadmin-section" style="display: none; border-color: var(--neon-orange); margin-bottom: 2rem;">
+      <h2 style="color: var(--neon-orange); margin-top: 0;">👑 Gestione Permessi Admin (Solo AgoGio)</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Abilita o disabilita il flag is_admin per i volontari per fornire l'accesso a questa dashboard responsabile.</p>
+      <div style="overflow-x: auto; max-height: 300px;">
+        <table class="dashboard-table" id="superadmin-table">
+          <thead>
+            <tr>
+              <th>Matricola</th>
+              <th>Nominativo</th>
+              <th>Qualifiche AREU</th>
+              <th>Stato Admin</th>
+              <th>Azioni</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Generato dinamicamente -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="glass-panel">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <h2 style="margin:0;">Prospetto Turni (Live Firestore)</h2>
+        <select class="btn" style="background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid var(--border-glass);">
+          <option>Orizzonte 3 Mesi</option>
+        </select>
+      </div>
+
+      <div style="overflow-x: auto; padding-bottom: 2rem;">
+        <table class="dashboard-table" id="admin-table">
+          <thead>
+            <tr>
+              <th>Data e Orario</th>
+              <th>Tipo Servizio</th>
+              <th>Stato</th>
+              <th>Autista</th>
+              <th>Referente SOREU</th>
+              <th>Soccorritore</th>
+              <th>Allievo (4° Posto)</th>
+              <th style="width: 260px;">Azioni Amministrative</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Generato via Firestore onSnapshot -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <div class="staging-bar" id="staging-bar">
+    <div>
+      <strong style="font-size: 1.1rem;">📝 Modalità Bozza (Staging)</strong>
+      <span id="staging-count" style="margin-left: 1rem; color: var(--neon-orange); font-weight: 600; font-size: 0.95rem;"></span>
+    </div>
+    <div style="display: flex; gap: 1rem;">
+      <button class="btn" id="btn-discard" style="border-color: var(--neon-red); color: var(--neon-red); background: rgba(255,7,58,0.1);">Annulla Modifiche</button>
+      <button class="btn" id="btn-save" style="border-color: var(--neon-green); color: var(--neon-green); background: rgba(57,255,20,0.1); box-shadow: 0 0 10px rgba(57,255,20,0.2);">Salva e Invia Notifiche</button>
+    </div>
+  </div>
+
+  <script type="module" src="vista_responsabile.js"></script>
+</body>
+</html>

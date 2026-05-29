@@ -1,0 +1,23 @@
+{
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "import.js",
+      "deploy.js",
+      "init_superadmin.js",
+      "popola_giugno.js",
+      "verifica.js",
+      "crea_turni_test.js",
+      "dbsocc.csv",
+      "package.json",
+      "package-lock.json",
+      "struttura_turni.json",
+      "task.md",
+      "implementation_plan.md",
+      "walkthrough.md"
+    ]
+  }
+}

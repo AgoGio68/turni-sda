@@ -1,0 +1,46 @@
+{
+  "id_turno": "2026_05_29_DIURNO_MSB",
+  "data": "2026-05-29",
+  "orario": {
+    "inizio": "07:00",
+    "fine": "19:00"
+  },
+  "tipo_servizio": "EMERGENZA_118",
+  "stato_turno": "APERTO",
+  "requisiti_equipaggio": {
+    "autista_richiesto": true,
+    "referente_richiesto": true,
+    "soccorritore_richiesto": true,
+    "allievo_consentito": true
+  },
+  "equipaggio_attuale": {
+    "autista": {
+      "matricola": null,
+      "nominativo": null,
+      "convalidato_da_admin": false
+    },
+    "referente_soreu": {
+      "matricola": null,
+      "nominativo": null,
+      "convalidato_da_admin": false
+    },
+    "soccorritore": {
+      "matricola": null,
+      "nominativo": null,
+      "convalidato_da_admin": false
+    },
+    "allievo_quarto_posto": {
+      "matricola": null,
+      "nominativo": null,
+      "convalidato_da_admin": false
+    }
+  },
+  "log_modifiche": [
+    {
+      "timestamp": "2026-05-29T10:00:00Z",
+      "autore": "admin_001",
+      "azione": "Creazione turno",
+      "notifica_inviata": false
+    }
+  ]
+}
