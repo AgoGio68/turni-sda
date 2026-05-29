@@ -9,9 +9,9 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
    - match /turni/{turno} { allow read, write: if request.auth != null; }
 ================================================================================================
 */
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, query, onSnapshot, doc, updateDoc, getDoc } from "firebase/firestore";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, collection, query, onSnapshot, doc, updateDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { verificaIscrizione } from './regole_iscrizione.js';
 
 const firebaseConfig = {
@@ -37,6 +37,12 @@ let currentUser = null;
 document.addEventListener('DOMContentLoaded', () => {
   const userInfoDiv = document.getElementById('user-info');
   
+  const isSuperAdminOverride = localStorage.getItem('superadmin_override') === 'true';
+  if (isSuperAdminOverride) {
+      window.location.href = "vista_responsabile.html";
+      return;
+  }
+
   onAuthStateChanged(auth, async (user) => {
     try {
       if (user) {
@@ -44,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Se AgoGio finisce qui per sbaglio, rimandalo alla vista_responsabile
         if (matricola.toLowerCase() === 'agogio') {
+           localStorage.setItem('superadmin_override', 'true');
            window.location.href = "vista_responsabile.html";
            return;
         }

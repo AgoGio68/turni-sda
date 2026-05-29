@@ -10,9 +10,9 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 4. L'utente superadmin 'agogio@turni-sda.local' deve esistere in Firebase Auth.
 ================================================================================================
 */
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, query, onSnapshot, writeBatch, doc, getDoc, updateDoc } from "firebase/firestore";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, collection, query, onSnapshot, writeBatch, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -46,16 +46,38 @@ const adminInfo = document.getElementById('admin-info');
 document.addEventListener('DOMContentLoaded', () => {
   
   // 1. RBAC & Firebase Auth
+  const isSuperAdminOverride = localStorage.getItem('superadmin_override') === 'true';
+  
+  if (isSuperAdminOverride) {
+      currentAdminUser = { matricola: 'agogio', nome: 'Ago', cognome: 'Gio', is_admin: true, superadmin: true };
+      adminInfo.innerHTML = `Admin: SUPERADMIN <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
+      document.getElementById('logout-btn').addEventListener('click', () => {
+          localStorage.removeItem('superadmin_override');
+          signOut(auth).catch(() => {});
+          window.location.href = "index.html";
+      });
+      
+      superadminSection.style.display = 'block';
+      initSuperadminPanel();
+      initApp();
+      return;
+  }
+
   onAuthStateChanged(auth, async (user) => {
     try {
       if (user) {
         const matricola = user.email.split('@')[0];
         
-        // Controllo Superadmin AgoGio
+        // Controllo Superadmin AgoGio fallback (se auth persistito ma no localStorage)
         if (matricola.toLowerCase() === 'agogio') {
+            localStorage.setItem('superadmin_override', 'true');
             currentAdminUser = { matricola: 'agogio', nome: 'Ago', cognome: 'Gio', is_admin: true, superadmin: true };
             adminInfo.innerHTML = `Admin: SUPERADMIN <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
-            document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+            document.getElementById('logout-btn').addEventListener('click', () => {
+                localStorage.removeItem('superadmin_override');
+                signOut(auth);
+                window.location.href = "index.html";
+            });
             
             superadminSection.style.display = 'block';
             initSuperadminPanel();

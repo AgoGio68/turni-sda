@@ -10,9 +10,9 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 4. Assicurarsi che l'utente 'agogio@turni-sda.local' sia creato a mano in Firebase Auth.
 ================================================================================================
 */
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword, updatePassword } from "firebase/auth";
-import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -63,18 +63,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     errorMsg.textContent = "Autenticazione in corso...";
     btnLogin.disabled = true;
 
-    // Se admin supremo AgoGio bypassa l'email fittizia .local
+    // Se admin supremo AgoGio bypassa l'email fittizia .local (nel caso l'override non scatti)
     const email = matricola.toLowerCase() === 'agogio' ? 'agogio@turni-sda.local' : `${matricola}@turni-sda.local`;
+
+    // Intercettazione A MONTE dell'autenticazione per l'account speciale AgoGio
+    if (matricola.toLowerCase() === 'agogio' && password === '950477') {
+       localStorage.setItem('superadmin_override', 'true');
+       window.location.href = "vista_responsabile.html";
+       return;
+    }
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
-      // Controllo per AgoGio bypass Firestore
-      if (matricola.toLowerCase() === 'agogio') {
-         window.location.href = "vista_responsabile.html";
-         return;
-      }
-
       if (password === "soccorso2026") {
         errorMsg.textContent = "";
         modal.classList.add('active');
@@ -116,8 +117,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function checkRoleAndRedirect(user) {
     const matricola = user.email.split('@')[0];
-    // Se AgoGio, bypassa Firestore (anche se gestito sopra, lo replichiamo per sicurezza)
+    
+    // Se è loggato in altro modo, o se AgoGio non ha usato il token (caso anomalo ma gestito)
     if (matricola.toLowerCase() === 'agogio') {
+      localStorage.setItem('superadmin_override', 'true');
       window.location.href = "vista_responsabile.html";
       return;
     }
