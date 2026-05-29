@@ -58,6 +58,123 @@
     .status-wait { color: #38bdf8; background: rgba(56, 189, 248, 0.05); border: 1px solid #38bdf8; }
     
     .btn-take { padding: 0.5rem 1rem; font-size: 0.8rem; box-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
+
+    /* ========================================================== */
+    /*  SIDEBAR FILTRI A 3 STATI                                   */
+    /* ========================================================== */
+    .app-layout {
+      display: flex; gap: 1.5rem; align-items: flex-start;
+    }
+    .sidebar-filters {
+      position: sticky; top: 1rem;
+      width: 260px; min-width: 260px; flex-shrink: 0;
+      background: var(--surface-blur); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-glass); border-radius: var(--radius);
+      padding: 1.25rem; box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+    }
+    .sidebar-filters h3 {
+      margin: 0 0 1rem 0; font-size: 0.85rem; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 1px; font-weight: 700;
+    }
+    .filter-btn-group {
+      display: flex; flex-direction: column; gap: 0.5rem;
+    }
+    .filter-btn {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.6rem 0.8rem; border-radius: 8px;
+      border: 1px solid var(--border-glass); background: rgba(255,255,255,0.02);
+      color: var(--text-muted); font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; transition: all 0.25s ease; text-align: left;
+    }
+    .filter-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-main); }
+    .filter-btn.active {
+      border-color: var(--primary-neon); color: var(--text-main);
+      background: rgba(59,130,246,0.15); box-shadow: 0 0 12px rgba(59,130,246,0.25);
+    }
+    .filter-btn .filter-icon { font-size: 1.1rem; }
+    .filter-btn .filter-label { line-height: 1.3; }
+    .filter-btn .filter-label small { display: block; font-size: 0.65rem; font-weight: 400; color: var(--text-muted); margin-top: 2px; }
+
+    .sidebar-separator {
+      border: none; border-top: 1px solid var(--border-glass); margin: 1rem 0;
+    }
+    .btn-fullscreen {
+      width: 100%; padding: 0.55rem 0.8rem; border-radius: 8px;
+      border: 1px solid rgba(255,153,0,0.4); background: rgba(255,153,0,0.08);
+      color: var(--neon-orange); font-size: 0.8rem; font-weight: 700;
+      cursor: pointer; transition: all 0.25s ease; display: flex; align-items: center; gap: 0.5rem; justify-content: center;
+    }
+    .btn-fullscreen:hover { background: rgba(255,153,0,0.2); box-shadow: 0 0 12px rgba(255,153,0,0.3); }
+    
+    .calendar-wrapper { flex: 1; min-width: 0; }
+
+    /* ========================================================== */
+    /*  HIGHLIGHT UTENTE: BORDO NEON + BADGE RUOLO                 */
+    /* ========================================================== */
+    .day-card.my-shift {
+      border-color: var(--neon-green);
+      box-shadow: 0 0 14px rgba(57, 255, 20, 0.25), inset 0 0 20px rgba(57, 255, 20, 0.04);
+    }
+    .my-role-badge {
+      display: inline-block; font-size: 0.55rem; font-weight: 700; text-transform: uppercase;
+      padding: 0.1rem 0.4rem; border-radius: 4px; letter-spacing: 0.5px;
+      color: var(--neon-green); background: rgba(57,255,20,0.1); border: 1px solid rgba(57,255,20,0.4);
+      margin-top: 2px;
+    }
+
+    /* ========================================================== */
+    /*  STATO 2/3: CARD EQUIPAGGIO INLINE                          */
+    /* ========================================================== */
+    .inline-shift-card {
+      background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: var(--radius);
+      padding: 1rem; margin-bottom: 1rem;
+    }
+    .inline-shift-card.my-shift-inline {
+      border-color: var(--neon-green); box-shadow: 0 0 10px rgba(57,255,20,0.2);
+    }
+    .inline-crew-list { margin-top: 0.5rem; padding: 0; list-style: none; }
+    .inline-crew-list li {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.3rem 0; font-size: 0.78rem; color: var(--text-main);
+      border-bottom: 1px dashed rgba(255,255,255,0.04);
+    }
+    .inline-crew-list li:last-child { border-bottom: none; }
+    .inline-crew-list .crew-role { color: var(--text-muted); font-weight: 600; font-size: 0.65rem; text-transform: uppercase; min-width: 75px; }
+    .inline-crew-list .crew-vuoto { color: var(--neon-red); font-style: italic; font-weight: 600; }
+    .inline-crew-list .crew-me { color: var(--neon-green); font-weight: 700; }
+
+    /* ========================================================== */
+    /*  MODALITÀ TV / FULLSCREEN                                   */
+    /* ========================================================== */
+    body.tv-mode {
+      font-family: 'Century Gothic', CenturyGothic, AppleGothic, sans-serif !important;
+      font-weight: bold !important;
+    }
+    body.tv-mode .sidebar-filters,
+    body.tv-mode header,
+    body.tv-mode .bottom-sheet,
+    body.tv-mode .bs-overlay { display: none !important; }
+
+    body.tv-mode .container { max-width: 100%; margin: 0.5rem; padding: 0 0.5rem; }
+    body.tv-mode .app-layout { display: block; }
+    body.tv-mode .glass-panel { padding: 1rem; }
+    body.tv-mode .calendar-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.8rem; }
+    body.tv-mode .day-card { padding: 0.8rem; min-height: auto !important; }
+    body.tv-mode .day-card strong { font-size: 1.5rem !important; }
+    body.tv-mode .inline-shift-card { padding: 0.6rem; margin-bottom: 0.6rem; }
+    body.tv-mode .inline-crew-list li { font-size: 0.9rem; font-weight: bold; }
+    body.tv-mode .micro-bars { display: none; }
+    body.tv-mode .my-role-badge { font-size: 0.7rem; }
+
+    /* ========================================================== */
+    /*  RESPONSIVE                                                 */
+    /* ========================================================== */
+    @media (max-width: 768px) {
+      .app-layout { flex-direction: column; }
+      .sidebar-filters { width: 100%; min-width: unset; position: static; }
+      .filter-btn-group { flex-direction: row; flex-wrap: wrap; }
+      .filter-btn { flex: 1; min-width: 120px; }
+    }
   </style>
 </head>
 <body>
@@ -67,10 +184,38 @@
   </header>
 
   <main class="container">
-    <div class="glass-panel" style="padding: 1.5rem;">
-      <h2 style="font-size: 1.25rem;">Calendario Mensile</h2>
-      <div class="calendar-grid" id="calendar">
-        <!-- Generato via Firestore -->
+    <div class="app-layout">
+      <!-- SIDEBAR FILTRI -->
+      <aside class="sidebar-filters" id="sidebar">
+        <h3>🎛️ Visualizzazione</h3>
+        <div class="filter-btn-group">
+          <button class="filter-btn active" data-filter="focus" id="filter-focus">
+            <span class="filter-icon">👤</span>
+            <span class="filter-label">Focus Personale<small>Tutti i turni, dettaglio al click</small></span>
+          </button>
+          <button class="filter-btn" data-filter="miei" id="filter-miei">
+            <span class="filter-icon">⭐</span>
+            <span class="filter-label">Solo i Miei<small>Mostra solo i turni dove sei iscritto</small></span>
+          </button>
+          <button class="filter-btn" data-filter="tabellone" id="filter-tabellone">
+            <span class="filter-icon">📋</span>
+            <span class="filter-label">Tabellone Generale<small>Tutti i turni con equipaggi</small></span>
+          </button>
+        </div>
+        <hr class="sidebar-separator">
+        <button class="btn-fullscreen" id="btn-tv-mode">
+          🖥️ Modalità TV (Fullscreen)
+        </button>
+      </aside>
+
+      <!-- CALENDARIO -->
+      <div class="calendar-wrapper">
+        <div class="glass-panel" style="padding: 1.5rem;">
+          <h2 style="font-size: 1.25rem;">Calendario Mensile</h2>
+          <div class="calendar-grid" id="calendar">
+            <!-- Generato via Firestore -->
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -85,6 +230,6 @@
     </div>
   </div>
 
-  <script type="module" src="vista_volontario.js?v=2"></script>
+  <script type="module" src="vista_volontario.js?v=3"></script>
 </body>
 </html>

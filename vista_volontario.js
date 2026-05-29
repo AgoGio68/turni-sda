@@ -96,7 +96,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
       let turniList = [];
       let currentSelectedDate = null;
+      let currentFilter = 'focus'; // 'focus' | 'miei' | 'tabellone'
+      let isTvMode = false;
 
+      // =====================================================
+      //  SIDEBAR: FILTRI A 3 STATI
+      // =====================================================
+      const filterButtons = document.querySelectorAll('.filter-btn');
+      filterButtons.forEach(btn => {
+          btn.addEventListener('click', () => {
+              filterButtons.forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              currentFilter = btn.getAttribute('data-filter');
+              renderMacroCalendar();
+          });
+      });
+
+      // =====================================================
+      //  MODALITÀ TV (FULLSCREEN)
+      // =====================================================
+      const btnTv = document.getElementById('btn-tv-mode');
+      btnTv.addEventListener('click', () => {
+          isTvMode = !isTvMode;
+          document.body.classList.toggle('tv-mode', isTvMode);
+          btnTv.textContent = isTvMode ? '↩️ Esci da Modalità TV' : '🖥️ Modalità TV (Fullscreen)';
+          
+          if (isTvMode) {
+              // Forza il Tabellone quando si entra in TV
+              currentFilter = 'tabellone';
+              filterButtons.forEach(b => b.classList.remove('active'));
+              document.getElementById('filter-tabellone').classList.add('active');
+              
+              // Prova il fullscreen nativo
+              if (document.documentElement.requestFullscreen) {
+                  document.documentElement.requestFullscreen().catch(() => {});
+              }
+          } else {
+              if (document.fullscreenElement) {
+                  document.exitFullscreen().catch(() => {});
+              }
+              currentFilter = 'focus';
+              filterButtons.forEach(b => b.classList.remove('active'));
+              document.getElementById('filter-focus').classList.add('active');
+          }
+          renderMacroCalendar();
+      });
+
+      // =====================================================
+      //  FIRESTORE: LISTENER REAL-TIME
+      // =====================================================
       const q = query(collection(db, "turni")); 
       
       onSnapshot(q, (snapshot) => {
@@ -115,9 +163,85 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       bsOverlay.addEventListener('click', closeBottomSheet);
 
+      // =====================================================
+      //  UTILITY: Verifica se l'utente è in un turno
+      // =====================================================
+      const getUserRoleInShift = (turno) => {
+          const eq = turno.equipaggio_attuale || {};
+          if (eq.autista?.matricola === currentUser.matricola) return 'Autista';
+          if (eq.referente_soreu?.matricola === currentUser.matricola) return 'Rif. SOREU';
+          if (eq.soccorritore?.matricola === currentUser.matricola) return 'Soccorritore';
+          if (eq.allievo_quarto_posto?.matricola === currentUser.matricola) return 'Allievo';
+          return null;
+      };
+
+      // =====================================================
+      //  UTILITY: Rendering equipaggio inline ordinato
+      // =====================================================
+      const renderInlineEquipaggio = (turno) => {
+          const eq = turno.equipaggio_attuale || {};
+          const req = turno.requisiti_equipaggio || {};
+          
+          const slots = [];
+          
+          const addSlot = (key, label, membro, richiesto) => {
+              if (!richiesto && key !== 'allievo_quarto_posto') return;
+              if (key === 'allievo_quarto_posto' && !richiesto) return;
+              
+              if (membro?.matricola) {
+                  const isMe = membro.matricola === currentUser.matricola;
+                  // Usa il nominativo già formattato se presente, altrimenti fallback
+                  const nome = membro.nominativo || 'Sconosciuto';
+                  slots.push({
+                      label,
+                      nome,
+                      isMe,
+                      isEmpty: false,
+                      // Per ordinamento: estrai cognome dal nominativo "Cognome, Nome - Matricola"
+                      sortKey: nome
+                  });
+              } else {
+                  slots.push({
+                      label,
+                      nome: 'DA COPRIRE',
+                      isMe: false,
+                      isEmpty: true,
+                      sortKey: 'ZZZZZ' // va in fondo
+                  });
+              }
+          };
+          
+          addSlot('autista', 'AUT', eq.autista, req.autista_richiesto);
+          addSlot('referente_soreu', 'RIF', eq.referente_soreu, req.referente_richiesto);
+          addSlot('soccorritore', 'SOC', eq.soccorritore, req.soccorritore_richiesto);
+          addSlot('allievo_quarto_posto', 'ALL', eq.allievo_quarto_posto, req.allievo_consentito);
+          
+          // Ordinamento: nomi occupati in ordine alfabetico, vuoti in fondo
+          slots.sort((a, b) => {
+              if (a.isEmpty && !b.isEmpty) return 1;
+              if (!a.isEmpty && b.isEmpty) return -1;
+              return a.sortKey.localeCompare(b.sortKey, 'it', { sensitivity: 'base' });
+          });
+          
+          return slots.map(s => {
+              const nameClass = s.isEmpty ? 'crew-vuoto' : (s.isMe ? 'crew-me' : '');
+              return `<li><span class="crew-role">${s.label}</span> <span class="${nameClass}">${s.isEmpty ? '⚠ DA COPRIRE' : s.nome}</span></li>`;
+          }).join('');
+      };
+
+      // =====================================================
+      //  RENDERING: MACRO CALENDARIO
+      // =====================================================
       const renderMacroCalendar = () => {
         calendar.innerHTML = '';
-        const turniPerData = turniList.reduce((acc, turno) => {
+        
+        // Filtraggio in base allo stato del sidebar
+        let turniDaRendere = turniList;
+        if (currentFilter === 'miei') {
+            turniDaRendere = turniList.filter(t => getUserRoleInShift(t) !== null);
+        }
+        
+        const turniPerData = turniDaRendere.reduce((acc, turno) => {
             if(!acc[turno.data]) acc[turno.data] = [];
             acc[turno.data].push(turno);
             return acc;
@@ -125,11 +249,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const dateOrdinate = Object.keys(turniPerData).sort();
 
+        if (dateOrdinate.length === 0 && currentFilter === 'miei') {
+            calendar.innerHTML = '<p style="color:var(--text-muted); grid-column: 1 / -1; text-align:center; padding: 2rem;">Non sei iscritto a nessun turno al momento.</p>';
+            return;
+        }
+
         dateOrdinate.forEach(dataString => {
           const turniDelGiorno = turniPerData[dataString];
           const card = document.createElement('div');
           card.className = 'day-card';
           card.style.minHeight = '140px';
+          
+          // -----------------------------------------------
+          //  HIGHLIGHT: L'utente è in almeno un turno?
+          // -----------------------------------------------
+          let myRolesForDay = [];
+          turniDelGiorno.forEach(t => {
+              const role = getUserRoleInShift(t);
+              if (role) myRolesForDay.push(role);
+          });
+          const isMyDay = myRolesForDay.length > 0;
+          if (isMyDay) {
+              card.classList.add('my-shift');
+          }
           
           let badgeClass = 'incompleto';
           let statoDay = 'Aperto';
@@ -169,19 +311,63 @@ document.addEventListener('DOMContentLoaded', () => {
           const dateParts = dataString.split('-');
           const formattedDate = `${dateParts[2]}/${dateParts[1]}`;
 
-          card.innerHTML = `
-            <strong style="font-size: 1.25rem; text-shadow: 0 0 5px rgba(255,255,255,0.2);">${formattedDate}</strong>
-            <span class="badge ${badgeClass}" style="margin-top: 0.25rem; font-size: 0.65rem;">${statoDay}</span>
-            
-            <div class="micro-bars">
-                <span class="micro-bar-label">Mattina</span>
-                <div class="micro-bar ${fasce.M || ''}"></div>
-                <span class="micro-bar-label">Pomeriggio</span>
-                <div class="micro-bar ${fasce.P || ''}"></div>
-                <span class="micro-bar-label">Notte</span>
-                <div class="micro-bar ${fasce.N || ''}"></div>
-            </div>
-          `;
+          // Badge ruoli se l'utente è presente in quel giorno
+          const roleBadgesHTML = isMyDay 
+              ? myRolesForDay.map(r => `<span class="my-role-badge">${r}</span>`).join(' ')
+              : '';
+
+          // -----------------------------------------------
+          //  STATO 2 & 3: Equipaggi inline
+          // -----------------------------------------------
+          let inlineCardsHTML = '';
+          if (currentFilter === 'miei' || currentFilter === 'tabellone') {
+              const turniOrdGiorno = turniDelGiorno.sort((a,b) => (a.orario?.inizio||'').localeCompare(b.orario?.inizio||''));
+              inlineCardsHTML = turniOrdGiorno.map(t => {
+                  const myRole = getUserRoleInShift(t);
+                  const tipo = (t.tipo_servizio||'').replace(/_/g, ' ');
+                  const cardClass = myRole ? 'inline-shift-card my-shift-inline' : 'inline-shift-card';
+                  
+                  return `
+                      <div class="${cardClass}">
+                          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+                              <strong style="font-size:0.7rem; color:var(--text-muted);">${tipo}</strong>
+                              <span style="font-size:0.7rem; color:var(--text-muted);">🕒 ${t.orario?.inizio}-${t.orario?.fine}</span>
+                          </div>
+                          <ul class="inline-crew-list">${renderInlineEquipaggio(t)}</ul>
+                      </div>
+                  `;
+              }).join('');
+          }
+          
+          // -----------------------------------------------
+          //  RENDERING CARD
+          // -----------------------------------------------
+          if (currentFilter === 'focus') {
+              // STATO 1: Macro card classica con micro-bars
+              card.innerHTML = `
+                <strong style="font-size: 1.25rem; text-shadow: 0 0 5px rgba(255,255,255,0.2);">${formattedDate}</strong>
+                <span class="badge ${badgeClass}" style="margin-top: 0.25rem; font-size: 0.65rem;">${statoDay}</span>
+                ${roleBadgesHTML}
+                
+                <div class="micro-bars">
+                    <span class="micro-bar-label">Mattina</span>
+                    <div class="micro-bar ${fasce.M || ''}"></div>
+                    <span class="micro-bar-label">Pomeriggio</span>
+                    <div class="micro-bar ${fasce.P || ''}"></div>
+                    <span class="micro-bar-label">Notte</span>
+                    <div class="micro-bar ${fasce.N || ''}"></div>
+                </div>
+              `;
+          } else {
+              // STATO 2 e 3: Card con equipaggi inline
+              card.style.minHeight = 'auto';
+              card.innerHTML = `
+                <strong style="font-size: 1.25rem; text-shadow: 0 0 5px rgba(255,255,255,0.2);">${formattedDate}</strong>
+                <span class="badge ${badgeClass}" style="margin-top: 0.25rem; font-size: 0.65rem;">${statoDay}</span>
+                ${roleBadgesHTML}
+                ${inlineCardsHTML}
+              `;
+          }
 
           card.addEventListener('click', () => {
             currentSelectedDate = dataString;
@@ -194,6 +380,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       };
 
+      // =====================================================
+      //  RENDERING: MICRO (BOTTOM SHEET) — invariato
+      // =====================================================
       const renderMicroDay = (dataString) => {
         bsTitle.textContent = `Turni del ${dataString.split('-').reverse().join('/')}`;
         bsContent.innerHTML = '';
@@ -216,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.innerHTML = `
                 <div class="shift-header">
                     <div>
-                        <strong style="color:var(--text-main); font-size:1.1rem; letter-spacing: 0.5px;">${(turno.tipo_servizio||'').replace('_', ' ')}</strong><br>
+                        <strong style="color:var(--text-main); font-size:1.1rem; letter-spacing: 0.5px;">${(turno.tipo_servizio||'').replace(/_/g, ' ')}</strong><br>
                         <span style="color:var(--text-muted); font-size:0.9rem;">🕒 ${turno.orario?.inizio} - ${turno.orario?.fine}</span>
                     </div>
                     <span class="badge ${turno.stato_turno === 'APERTO' ? 'incompleto' : (turno.stato_turno === 'CRITICO' ? 'critico' : 'convalidato')}">${turno.stato_turno}</span>
@@ -240,6 +429,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       };
 
+      // =====================================================
+      //  RENDERING: SLOT ROW (invariato nella logica core)
+      // =====================================================
       const renderSlotRow = (turno, keyRuolo, labelRuolo, membro, richiesto, icon, fullTurniList) => {
         if(!richiesto && keyRuolo !== 'allievo_quarto_posto') return ''; 
         if(keyRuolo === 'allievo_quarto_posto' && !richiesto) return ''; 
@@ -310,6 +502,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       };
 
+      // =====================================================
+      //  CORE: ISCRIZIONE (INVARIATA)
+      // =====================================================
       const iscriviti = async (idTurno, ruolo) => {
         const turnoTarget = turniList.find(t => t.id === idTurno);
         if (!turnoTarget) return;
@@ -333,7 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
             logs.push({
                 timestamp: new Date().toISOString(),
                 autore: currentUser.matricola,
-                azione: `Iscrizione autonoma come ${ruolo.replace('_', ' ')}`,
+                azione: `Iscrizione autonoma come ${ruolo.replace(/_/g, ' ')}`,
                 notifica_inviata: false
             });
 
