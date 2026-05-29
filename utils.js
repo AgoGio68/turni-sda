@@ -4,8 +4,12 @@
 
 export function formattaNomeDisplay(nominativo) {
     if (!nominativo) return "Sconosciuto";
-    let display = nominativo.split(' - ')[0];
-    display = display.replace(',', '');
+    // Dividi per trattino (con o senza spazi) e prendi la prima parte
+    let display = nominativo.split(/\s*-\s*/)[0];
+    // Rimuovi la virgola e eventuali doppi spazi
+    display = display.replace(/,\s*/g, ' ').trim();
+    // Pulisci spazi doppi se presenti
+    display = display.replace(/\s{2,}/g, ' ');
     return display;
 }
 
