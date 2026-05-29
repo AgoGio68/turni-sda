@@ -1,4 +1,15 @@
-import { initializeApp } from "firebase/app";
+/*
+================================================================================================
+CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL LOGIN)
+================================================================================================
+1. Authentication: Abilitare il provider "Email/Password".
+2. Firestore Database: Creare una collezione "utenti" e "turni".
+3. Firestore Rules:
+   - match /utenti/{matricola} { allow read: if request.auth != null; }
+   - match /turni/{turno} { allow read, write: if request.auth != null; }
+================================================================================================
+*/
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, query, onSnapshot, doc, updateDoc, getDoc } from "firebase/firestore";
 import { verificaIscrizione } from './regole_iscrizione.js';
@@ -12,9 +23,14 @@ const firebaseConfig = {
   appId: "1:840030023706:web:1a6f738ed3051075c5a1a3"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+let app, auth, db;
+try {
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (err) {
+  console.error("Errore inizializzazione Firebase:", err.code, err.message);
+}
 
 let currentUser = null;
 
@@ -22,20 +38,32 @@ document.addEventListener('DOMContentLoaded', () => {
   const userInfoDiv = document.getElementById('user-info');
   
   onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      const matricola = user.email.split('@')[0];
-      const snap = await getDoc(doc(db, "utenti", matricola));
-      if (snap.exists()) {
-        currentUser = snap.data();
-        userInfoDiv.innerHTML = `Profilo: ${currentUser.nome} ${currentUser.cognome} (${currentUser.matricola}) <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
-        document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
-        initApp();
+    try {
+      if (user) {
+        const matricola = user.email.split('@')[0];
+        
+        // Se AgoGio finisce qui per sbaglio, rimandalo alla vista_responsabile
+        if (matricola.toLowerCase() === 'agogio') {
+           window.location.href = "vista_responsabile.html";
+           return;
+        }
+
+        const snap = await getDoc(doc(db, "utenti", matricola));
+        if (snap.exists()) {
+          currentUser = snap.data();
+          userInfoDiv.innerHTML = `Profilo: ${currentUser.nome} ${currentUser.cognome} (${currentUser.matricola}) <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
+          document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+          initApp();
+        } else {
+          console.error("Errore Logico: Profilo volontario non trovato in Firestore. Matricola:", matricola);
+          alert("Profilo volontario non trovato nel database.");
+          signOut(auth);
+        }
       } else {
-        alert("Profilo volontario non trovato nel database.");
-        signOut(auth);
+        window.location.href = "index.html";
       }
-    } else {
-      window.location.href = "index.html";
+    } catch (e) {
+      console.error("Errore in onAuthStateChanged:", e.code, e.message);
     }
   });
 

@@ -1,4 +1,16 @@
-import { initializeApp } from "firebase/app";
+/*
+================================================================================================
+CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL LOGIN)
+================================================================================================
+1. Authentication: Abilitare il provider "Email/Password".
+2. Firestore Database: Creare una collezione "utenti" e "turni".
+3. Firestore Rules:
+   - match /utenti/{matricola} { allow read, write: if request.auth != null; }
+   - match /turni/{turno} { allow read, write: if request.auth != null; }
+4. L'utente superadmin 'agogio@turni-sda.local' deve esistere in Firebase Auth.
+================================================================================================
+*/
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, query, onSnapshot, writeBatch, doc, getDoc, updateDoc } from "firebase/firestore";
 
@@ -11,9 +23,14 @@ const firebaseConfig = {
   appId: "1:840030023706:web:1a6f738ed3051075c5a1a3"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+let app, auth, db;
+try {
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (err) {
+  console.error("Errore inizializzazione Firebase:", err.code, err.message);
+}
 
 let modificheSospese = []; 
 let turniOriginali = new Map();
@@ -30,35 +47,40 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // 1. RBAC & Firebase Auth
   onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      const matricola = user.email.split('@')[0];
-      
-      // Controllo Superadmin AgoGio
-      if (matricola === 'agogio') {
-          currentAdminUser = { matricola: 'agogio', nome: 'Ago', cognome: 'Gio', is_admin: true, superadmin: true };
-          adminInfo.innerHTML = `Admin: SUPERADMIN <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
-          document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
-          
-          superadminSection.style.display = 'block';
-          initSuperadminPanel();
-          initApp();
+    try {
+      if (user) {
+        const matricola = user.email.split('@')[0];
+        
+        // Controllo Superadmin AgoGio
+        if (matricola.toLowerCase() === 'agogio') {
+            currentAdminUser = { matricola: 'agogio', nome: 'Ago', cognome: 'Gio', is_admin: true, superadmin: true };
+            adminInfo.innerHTML = `Admin: SUPERADMIN <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
+            document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+            
+            superadminSection.style.display = 'block';
+            initSuperadminPanel();
+            initApp();
+        } else {
+            // Controllo Admin normale (Volontario con is_admin: true)
+            const snap = await getDoc(doc(db, "utenti", matricola));
+            if (snap.exists() && snap.data().is_admin) {
+                currentAdminUser = snap.data();
+                adminInfo.innerHTML = `Admin: ${currentAdminUser.nome} ${currentAdminUser.cognome} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
+                document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+                
+                superadminSection.style.display = 'none'; // Nascosto
+                initApp();
+            } else {
+                console.error("Accesso negato: Permessi non sufficienti per la matricola", matricola);
+                alert("Accesso negato: non hai i permessi di amministratore per questa vista.");
+                signOut(auth);
+            }
+        }
       } else {
-          // Controllo Admin normale (Volontario con is_admin: true)
-          const snap = await getDoc(doc(db, "utenti", matricola));
-          if (snap.exists() && snap.data().is_admin) {
-              currentAdminUser = snap.data();
-              adminInfo.innerHTML = `Admin: ${currentAdminUser.nome} ${currentAdminUser.cognome} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
-              document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
-              
-              superadminSection.style.display = 'none'; // Nascosto
-              initApp();
-          } else {
-              alert("Accesso negato: non hai i permessi di amministratore per questa vista.");
-              signOut(auth);
-          }
+        window.location.href = "index.html"; // Redirect al login
       }
-    } else {
-      window.location.href = "index.html"; // Redirect al login
+    } catch (e) {
+      console.error("Errore in onAuthStateChanged Responsabile:", e.code, e.message);
     }
   });
   
