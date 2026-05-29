@@ -87,6 +87,7 @@
   </div>
 
   <div class="version-footer" id="version-text">Ver. ---</div>
+  <button id="btn-open-guide" class="btn" style="position: absolute; bottom: 1rem; left: 1rem; background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid var(--border-glass); padding: 0.5rem 1rem; font-size: 0.85rem; z-index: 10;">📖 Guida Applicazione</button>
 
   <!-- Modal Cambio Password Obbligatorio -->
   <div class="pw-modal-overlay" id="pw-modal">
@@ -99,6 +100,66 @@
     </div>
   </div>
 
-  <script type="module" src="login.js?v=1.3.9"></script>
+  <!-- Modal Guida Operativa -->
+  <div class="pw-modal-overlay" id="guide-modal">
+    <div class="pw-modal-box" style="max-width: 800px; max-height: 90vh; overflow-y: auto; text-align: left; padding: 2.5rem;">
+      <h2 style="color: var(--primary-neon); margin-top:0; text-align: center; font-size: 1.8rem; letter-spacing: 1px;">📖 Guida Operativa Definitiva</h2>
+      <p style="color: var(--text-muted); text-align: center; margin-bottom: 2rem;">Manuale d'uso del Sistema Informativo Turni SDA</p>
+      
+      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem;">1. LEGENDA ICONE E TERMINOLOGIA DI TABELLONE</h3>
+      <ul style="list-style: none; padding: 0; color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
+        <li style="margin-bottom: 0.8rem;"><strong>🚑 EMERGENZA 118 / ASSISTENZA:</strong> Identifica la tipologia di servizio ministeriale o secondario associata allo slot orario.</li>
+        <li style="margin-bottom: 0.8rem;"><strong><span class="badge" style="background:rgba(255,7,58,0.1); border:1px solid var(--neon-red); color:var(--neon-red); font-size: 0.7rem; padding: 0.2rem 0.4rem; border-radius: 4px;">CRITICO</span> (Badge Rosso):</strong> Indica che la giornata presenta scoperture gravi che compromettono l'operatività del mezzo.</li>
+        <li style="margin-bottom: 0.8rem;"><strong>⚠️ DA COPRIRE:</strong> Indica tassativamente uno slot di equipaggio vuoto che richiede la presenza urgente di un volontario.</li>
+        <li style="margin-bottom: 0.8rem;"><strong>AUT (Autista):</strong> Personale abilitato alla conduzione dei mezzi di soccorso avanzato.</li>
+        <li style="margin-bottom: 0.8rem;"><strong>RIF (Caposquadra / Riferimento):</strong> Responsabile sanitario dell'equipaggio e delle comunicazioni radio con la centrale operativa.</li>
+        <li style="margin-bottom: 0.8rem;"><strong>SOC (Soccorritore):</strong> Volontario certificato addetto al trattamento e stabilizzazione del target.</li>
+        <li style="margin-bottom: 0.8rem;"><strong>ALL (Allievo / Milite in prova):</strong> Personale in affiancamento per completamento del percorso di tirocinio.</li>
+        <li style="margin-bottom: 0.8rem;"><strong>🟢 Highlight Verde / Bordo Neon:</strong> Evidenziazione visiva applicata in tempo reale ESCLUSIVAMENTE sul singolo slot orario in cui l'utente attualmente loggato è di servizio.</li>
+      </ul>
+
+      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">2. MATRICE DEI PERMESSI E CONFIGURAZIONE RUOLI</h3>
+      
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+        <h4 style="color: var(--neon-green); margin-top: 0;">🟢 LIVELLO 1: SEMPLICE VOLONTARIO</h4>
+        <p style="color: var(--text-main); font-size: 0.9rem; line-height: 1.5;"><strong>Cosa può fare:</strong> Visualizzazione del Calendario Mensile. Accesso alla Sidebar Dinamica con due modalità di filtro:</p>
+        <ul style="color: var(--text-main); font-size: 0.9rem; line-height: 1.5; margin-top: 0.5rem; margin-bottom: 1rem; padding-left: 1.2rem;">
+          <li><em>STATO 1 (Focus Personale):</em> Cliccando su un turno qualsiasi, legge l'equipaggio completo nella sidebar.</li>
+          <li><em>STATO 2 (Filtro Personale):</em> Svuota il tabellone per mostrare solo ed esclusivamente i propri turni di servizio individuali, con l'equipaggio già stampato all'interno del tassello in formato pulito "Cognome Nome" (in ordine alfabetico).</li>
+        </ul>
+        <p style="color: var(--text-main); font-size: 0.9rem; line-height: 1.5;"><strong>Accesso:</strong> Tramite credenziali personali fornite dalla segreteria.</p>
+        <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,0,0,0.5); border-left: 3px solid var(--neon-green); font-family: monospace; color: var(--text-muted); font-size: 0.85rem;">
+          🔑 Password Standard Volontario: <span style="color: var(--text-main);">soccorso2026</span>
+        </div>
+      </div>
+
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+        <h4 style="color: #38bdf8; margin-top: 0;">🟡 LIVELLO 2: AMMINISTRATORE (Segreteria / Gestione Turni)</h4>
+        <p style="color: var(--text-main); font-size: 0.9rem; line-height: 1.5;"><strong>Cosa può fare:</strong> Eredita tutte le funzioni del Volontario. Accede al pannello di pianificazione avanzato per inserire, modificare o cancellare i volontari dai singoli slot orari, sbloccare i turni bloccati e gestire la copertura delle criticità segnalate in rosso.</p>
+        <p style="color: var(--text-main); font-size: 0.9rem; line-height: 1.5; margin-top: 0.5rem;"><strong>Accesso:</strong> Richiede account verificato con privilegi di livello 'admin'.</p>
+        <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,0,0,0.5); border-left: 3px solid #38bdf8; font-family: monospace; color: var(--text-muted); font-size: 0.85rem;">
+          🔑 Password Standard Admin: <span style="color: var(--text-main);">soccorso2026</span> (o definita dall'utente)
+        </div>
+      </div>
+
+      <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+        <h4 style="color: var(--neon-red); margin-top: 0;">🔴 LIVELLO 3: SUPERADMIN (Presidente / Direzione Civile)</h4>
+        <p style="color: var(--text-main); font-size: 0.9rem; line-height: 1.5;"><strong>Cosa può fare:</strong> Controllo totale e insindacabile del software. Accede in esclusiva al pannello <strong>Anagrafica Volontari</strong>, dove può modificare istantaneamente il ruolo di qualsiasi utente tramite un menu a tendina con salvataggio immediato (onchange) sul database. Gestisce e configura il token del <strong>Magic Link</strong> per la Modalità Kiosk.</p>
+        <p style="color: var(--text-main); font-size: 0.9rem; line-height: 1.5; margin-top: 0.5rem;"><strong>Accesso:</strong> Account supremo ad accesso ristretto.</p>
+        <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,0,0,0.5); border-left: 3px solid var(--neon-red); font-family: monospace; color: var(--text-muted); font-size: 0.85rem;">
+          🔑 Password Suprema Superadmin: <span style="color: var(--text-main);">950477</span>
+        </div>
+      </div>
+
+      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">3. MODALITÀ KIOSK / MONITOR DI SEDE</h3>
+      <p style="color: var(--text-main); font-size: 0.9rem; line-height: 1.5;">Lo schermo non utilizza email e password, ma si avvia tramite un URL speciale tokenizzato (Magic Link) che interroga asincronamente il database.<br><br>Avvia direttamente lo <strong>STATO 3 (Tabellone Generale / Modalità TV)</strong>: nasconde le funzioni interattive, massimizza i tasselli a schermo intero e impone l'uso del font "Century Gothic grassetto" con tutti i nomi dei volontari attivi colorati in <span style="color: var(--neon-green); font-weight: bold;">VERDE</span> brillantissimo su sfondo scuro, ordinati rigorosamente in ordine alfabetico (dalla A alla Z per Cognome, e in subordine per Nome).</p>
+
+      <div style="text-align: center; margin-top: 2.5rem;">
+        <button class="btn" id="btn-close-guide" style="padding: 0.8rem 2rem; font-size: 1rem; border-color: var(--neon-orange); color: var(--neon-orange);">Chiudi Guida</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="login.js?v=1.3.11"></script>
 </body>
 </html>

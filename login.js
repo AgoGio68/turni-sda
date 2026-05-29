@@ -83,6 +83,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnSavePw = document.getElementById('btn-save-pw');
   const pwError = document.getElementById('pw-error');
 
+  // Gestione Guida Operativa
+  const guideModal = document.getElementById('guide-modal');
+  const btnOpenGuide = document.getElementById('btn-open-guide');
+  const btnCloseGuide = document.getElementById('btn-close-guide');
+  
+  if (btnOpenGuide && guideModal) {
+    btnOpenGuide.addEventListener('click', () => {
+      guideModal.classList.add('active');
+    });
+  }
+  if (btnCloseGuide && guideModal) {
+    btnCloseGuide.addEventListener('click', () => {
+      guideModal.classList.remove('active');
+    });
+  }
+
   btnLogin.addEventListener('click', async () => {
     const rawMatricola = document.getElementById('matricola').value;
     const password = document.getElementById('password').value.trim();
