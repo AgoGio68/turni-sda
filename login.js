@@ -44,7 +44,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const btnLogin = document.getElementById('btn-login');
   const errorMsg = document.getElementById('login-error');
-  
+
+  // =====================================================
+  //  MAGIC LINK KIOSK: Intercettazione ?kiosk=TOKEN
+  // =====================================================
+  const urlParams = new URLSearchParams(window.location.search);
+  const kioskToken = urlParams.get('kiosk');
+
+  if (kioskToken) {
+      errorMsg.textContent = "🖥️ Accesso Kiosk in corso...";
+      btnLogin.disabled = true;
+
+      try {
+          // 1. Autenticazione con account kiosk dedicato
+          await signInWithEmailAndPassword(auth, 'kiosk@turni-sda.local', 'kiosk2026');
+
+          // 2. Verifica token contro il database
+          const kioskDoc = await getDoc(doc(db, "utenti", "kiosk"));
+
+          if (kioskDoc.exists() && kioskDoc.data().kiosk_token === kioskToken) {
+              // 3. Token valido → Accesso diretto in modalità TV
+              window.location.href = "vista_volontario.html?mode=kiosk";
+          } else {
+              // Token non valido
+              await auth.signOut();
+              errorMsg.textContent = "Token Kiosk non valido.";
+              btnLogin.disabled = false;
+          }
+      } catch (e) {
+          console.error("Errore accesso Kiosk:", e.code, e.message);
+          errorMsg.textContent = "Errore accesso Kiosk.";
+          btnLogin.disabled = false;
+      }
+      return; // Blocca il flusso normale del login
+  }
+
   const modal = document.getElementById('pw-modal');
   const btnSavePw = document.getElementById('btn-save-pw');
   const pwError = document.getElementById('pw-error');

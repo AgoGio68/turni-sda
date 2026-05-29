@@ -35,19 +35,33 @@ try {
 
 let currentUser = null;
 
+// Rileva modalità Kiosk dal parametro URL
+const isKioskMode = new URLSearchParams(window.location.search).get('mode') === 'kiosk';
+
 document.addEventListener('DOMContentLoaded', () => {
   const userInfoDiv = document.getElementById('user-info');
   
-  const isSuperAdminOverride = localStorage.getItem('superadmin_override') === 'true';
-  if (isSuperAdminOverride) {
-      window.location.href = "vista_responsabile.html";
-      return;
+  // In modalità kiosk, NON redirigere alla vista responsabile
+  if (!isKioskMode) {
+      const isSuperAdminOverride = localStorage.getItem('superadmin_override') === 'true';
+      if (isSuperAdminOverride) {
+          window.location.href = "vista_responsabile.html";
+          return;
+      }
   }
 
   onAuthStateChanged(auth, async (user) => {
     try {
       if (user) {
         const matricola = user.email.split('@')[0];
+        
+        // ---- KIOSK MODE: bypass speciali ----
+        if (isKioskMode) {
+            currentUser = { matricola: 'kiosk', nome: 'Tabellone', cognome: 'Kiosk', is_kiosk: true };
+            userInfoDiv.innerHTML = `<span style="color:var(--neon-orange);">🖥️ Modalità Tabellone (Sola Lettura)</span>`;
+            initApp();
+            return;
+        }
         
         // Se AgoGio finisce qui per sbaglio, rimandalo alla vista_responsabile
         if (matricola.toLowerCase() === 'agogio') {
@@ -97,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
       let turniList = [];
       let currentSelectedDate = null;
       let currentFilter = 'focus'; // 'focus' | 'miei' | 'tabellone'
-      let isTvMode = false;
+      let isTvMode = isKioskMode; // Se kiosk, parte in TV mode
 
       // =====================================================
       //  SIDEBAR: FILTRI A 3 STATI
@@ -111,6 +125,24 @@ document.addEventListener('DOMContentLoaded', () => {
               renderMacroCalendar();
           });
       });
+
+      // =====================================================
+      //  KIOSK: Attivazione automatica TV + Tabellone
+      // =====================================================
+      if (isKioskMode) {
+          currentFilter = 'tabellone';
+          document.body.classList.add('tv-mode');
+          const sidebar = document.getElementById('sidebar');
+          if (sidebar) sidebar.style.display = 'none';
+          filterButtons.forEach(b => b.classList.remove('active'));
+          const tabBtn = document.getElementById('filter-tabellone');
+          if (tabBtn) tabBtn.classList.add('active');
+          
+          // Fullscreen nativo
+          if (document.documentElement.requestFullscreen) {
+              document.documentElement.requestFullscreen().catch(() => {});
+          }
+      }
 
       // =====================================================
       //  MODALITÀ TV (FULLSCREEN)
@@ -483,6 +515,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (giaNelTurno) {
                 btnStr = '<span style="font-size:0.75rem; color:var(--neon-green)">Sei in questo equipaggio</span>';
+            } else if (isKioskMode) {
+                // Kiosk: nessun bottone, sola lettura
+                btnStr = '';
             } else if (!riposoCheck.idoneo) {
                 btnStr = `<span style="font-size:0.7rem; color:var(--neon-orange); text-align:right; max-width: 140px; line-height:1.2;" title="${riposoCheck.motivo}">Blocco 118:<br>${riposoCheck.motivo}</span>`;
             } else if (!regole.idoneo) {
