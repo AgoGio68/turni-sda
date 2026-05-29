@@ -200,10 +200,11 @@ document.addEventListener('DOMContentLoaded', () => {
       // =====================================================
       const getUserRoleInShift = (turno) => {
           const eq = turno.equipaggio_attuale || {};
-          if (eq.autista?.matricola === currentUser.matricola) return 'Autista';
-          if (eq.referente_soreu?.matricola === currentUser.matricola) return 'Rif. SOREU';
-          if (eq.soccorritore?.matricola === currentUser.matricola) return 'Soccorritore';
-          if (eq.allievo_quarto_posto?.matricola === currentUser.matricola) return 'Allievo';
+          const myId = String(currentUser.matricola);
+          if (eq.autista?.matricola && String(eq.autista.matricola) === myId) return 'Autista';
+          if (eq.referente_soreu?.matricola && String(eq.referente_soreu.matricola) === myId) return 'Rif. SOREU';
+          if (eq.soccorritore?.matricola && String(eq.soccorritore.matricola) === myId) return 'Soccorritore';
+          if (eq.allievo_quarto_posto?.matricola && String(eq.allievo_quarto_posto.matricola) === myId) return 'Allievo';
           return null;
       };
 
@@ -221,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
               if (key === 'allievo_quarto_posto' && !richiesto) return;
               
               if (membro?.matricola) {
-                  const isMe = membro.matricola === currentUser.matricola;
+                  const isMe = String(membro.matricola) === String(currentUser.matricola);
                   // Usa il nominativo già formattato se presente, altrimenti fallback
                   const nomeDb = membro.nominativo || 'Sconosciuto';
                   const nomeDisplay = nomeDb !== 'Sconosciuto' ? formattaNomeDisplay(nomeDb) : nomeDb;
@@ -294,17 +295,23 @@ document.addEventListener('DOMContentLoaded', () => {
           card.style.minHeight = '140px';
           
           // -----------------------------------------------
-          //  HIGHLIGHT: Calcola il ruolo per OGNI singolo turno
+          //  HIGHLIGHT: Calcola il ruolo per OGNI singolo turno e aggiungi la classe .my-shift
           // -----------------------------------------------
           let myRolesPerFascia = { M: null, P: null, N: null };
+          let isMyDay = false;
           turniDelGiorno.forEach(t => {
               const role = getUserRoleInShift(t);
               if (role) {
+                  isMyDay = true;
                   const oraI = parseInt((t.orario?.inizio || '08:00').split(':')[0]);
                   const f = oraI < 13 ? 'M' : (oraI < 19 ? 'P' : 'N');
                   myRolesPerFascia[f] = role;
               }
           });
+          
+          if (isMyDay) {
+              card.classList.add('my-shift');
+          }
           
           let badgeClass = 'incompleto';
           let statoDay = 'Aperto';
@@ -474,7 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(keyRuolo === 'allievo_quarto_posto' && !richiesto) return ''; 
 
         if (membro?.matricola) {
-            const isMe = membro.matricola === currentUser.matricola;
+            const isMe = String(membro.matricola) === String(currentUser.matricola);
             const nomeDb = membro.nominativo || 'Sconosciuto';
             const nomeDisplay = nomeDb !== 'Sconosciuto' ? formattaNomeDisplay(nomeDb) : nomeDb;
             const nomeStampato = isMe ? `<span style="color:var(--neon-green)">Tu (${nomeDisplay})</span>` : nomeDisplay;
@@ -494,18 +501,19 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         } else {
             const eqCompleto = turno.equipaggio_attuale || {};
-            const giaNelTurno = (eqCompleto.autista?.matricola === currentUser.matricola || 
-                                 eqCompleto.referente_soreu?.matricola === currentUser.matricola ||
-                                 eqCompleto.soccorritore?.matricola === currentUser.matricola ||
-                                 eqCompleto.allievo_quarto_posto?.matricola === currentUser.matricola);
+            const myIdStr = String(currentUser.matricola);
+            const giaNelTurno = (eqCompleto.autista?.matricola && String(eqCompleto.autista.matricola) === myIdStr) || 
+                                (eqCompleto.referente_soreu?.matricola && String(eqCompleto.referente_soreu.matricola) === myIdStr) ||
+                                (eqCompleto.soccorritore?.matricola && String(eqCompleto.soccorritore.matricola) === myIdStr) ||
+                                (eqCompleto.allievo_quarto_posto?.matricola && String(eqCompleto.allievo_quarto_posto.matricola) === myIdStr);
 
             const myShifts = fullTurniList.filter(t => {
                 if (t.id === turno.id) return false;
                 const e = t.equipaggio_attuale || {};
-                return (e.autista?.matricola === currentUser.matricola || 
-                        e.referente_soreu?.matricola === currentUser.matricola ||
-                        e.soccorritore?.matricola === currentUser.matricola ||
-                        e.allievo_quarto_posto?.matricola === currentUser.matricola);
+                return (e.autista?.matricola && String(e.autista.matricola) === myIdStr) || 
+                       (e.referente_soreu?.matricola && String(e.referente_soreu.matricola) === myIdStr) ||
+                       (e.soccorritore?.matricola && String(e.soccorritore.matricola) === myIdStr) ||
+                       (e.allievo_quarto_posto?.matricola && String(e.allievo_quarto_posto.matricola) === myIdStr);
             }).map(t => ({
                 data: t.data,
                 inizio: t.orario?.inizio || "00:00",
