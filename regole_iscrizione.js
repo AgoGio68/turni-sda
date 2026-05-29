@@ -57,3 +57,46 @@ export function verificaIscrizione(utente, turno, postoRichiesto) {
 
   return { idoneo: true, motivo: "Iscrizione idonea." };
 }
+
+/**
+ * Verifica se un volontario può iscriversi a un turno rispettando i riposi obbligatori.
+ */
+export function validaRiposi(nuovoTurnoData, orarioInizio, orarioFine, turniEsistentiDelVolontario) {
+    const MIN_RIPOSO_ORE = 11;
+    const MILLISECONDS_IN_HOUR = 1000 * 60 * 60;
+
+    const shiftStart = new Date(`${nuovoTurnoData}T${orarioInizio}:00`);
+    let shiftEnd = new Date(`${nuovoTurnoData}T${orarioFine}:00`);
+    
+    if (shiftEnd <= shiftStart) {
+        shiftEnd.setDate(shiftEnd.getDate() + 1);
+    }
+
+    for (const t of turniEsistentiDelVolontario) {
+        const tStart = new Date(`${t.data}T${t.inizio}:00`);
+        let tEnd = new Date(`${t.data}T${t.fine}:00`);
+        if (tEnd <= tStart) tEnd.setDate(tEnd.getDate() + 1);
+
+        if ((shiftStart >= tStart && shiftStart < tEnd) || 
+            (shiftEnd > tStart && shiftEnd <= tEnd) ||
+            (shiftStart <= tStart && shiftEnd >= tEnd)) {
+            return { idoneo: false, motivo: "Sovrapposizione oraria rilevata con un altro turno assegnato." };
+        }
+
+        if (shiftEnd <= tStart) {
+            const oreRiposo = (tStart - shiftEnd) / MILLISECONDS_IN_HOUR;
+            if (oreRiposo < MIN_RIPOSO_ORE) {
+                return { idoneo: false, motivo: `Riposo insufficiente: garantite solo ${oreRiposo.toFixed(1)}h prima del turno successivo (minimo richiesto: ${MIN_RIPOSO_ORE}h).` };
+            }
+        }
+        
+        if (shiftStart >= tEnd) {
+            const oreRiposo = (shiftStart - tEnd) / MILLISECONDS_IN_HOUR;
+            if (oreRiposo < MIN_RIPOSO_ORE) {
+                return { idoneo: false, motivo: `Riposo insufficiente: riposo di solo ${oreRiposo.toFixed(1)}h dal turno precedente (minimo richiesto: ${MIN_RIPOSO_ORE}h).` };
+            }
+        }
+    }
+
+    return { idoneo: true, motivo: "Iscrizione valida e conforme alle regole 118." };
+}

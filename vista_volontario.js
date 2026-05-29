@@ -12,7 +12,7 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, query, onSnapshot, doc, updateDoc, getDoc } from "firebase/firestore";
-import { verificaIscrizione } from './regole_iscrizione.js';
+import { verificaIscrizione, validaRiposi } from './regole_iscrizione.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -209,10 +209,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="badge ${turno.stato_turno === 'APERTO' ? 'incompleto' : (turno.stato_turno === 'CRITICO' ? 'critico' : 'convalidato')}">${turno.stato_turno}</span>
                 </div>
                 <div class="shift-slots">
-                    ${renderSlotRow(turno, 'autista', 'AUTISTA', eq.autista, req.autista_richiesto, '🚑', turniDelGiorno)}
-                    ${renderSlotRow(turno, 'referente_soreu', 'SOCC. REFERENTE SOREU', eq.referente_soreu, req.referente_richiesto, '📞', turniDelGiorno)}
-                    ${renderSlotRow(turno, 'soccorritore', 'SOCCORRITORE', eq.soccorritore, req.soccorritore_richiesto, '🎒', turniDelGiorno)}
-                    ${renderSlotRow(turno, 'allievo_quarto_posto', 'ALLIEVO 4° POSTO', eq.allievo_quarto_posto, req.allievo_consentito, '🔰', turniDelGiorno)}
+                    ${renderSlotRow(turno, 'autista', 'AUTISTA', eq.autista, req.autista_richiesto, '🚑', turniList)}
+                    ${renderSlotRow(turno, 'referente_soreu', 'SOCC. REFERENTE SOREU', eq.referente_soreu, req.referente_richiesto, '📞', turniList)}
+                    ${renderSlotRow(turno, 'soccorritore', 'SOCCORRITORE', eq.soccorritore, req.soccorritore_richiesto, '🎒', turniList)}
+                    ${renderSlotRow(turno, 'allievo_quarto_posto', 'ALLIEVO 4° POSTO', eq.allievo_quarto_posto, req.allievo_consentito, '🔰', turniList)}
                 </div>
             `;
             bsContent.appendChild(card);
@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       };
 
-      const renderSlotRow = (turno, keyRuolo, labelRuolo, membro, richiesto, icon, tuttiITurniDelGiorno) => {
+      const renderSlotRow = (turno, keyRuolo, labelRuolo, membro, richiesto, icon, fullTurniList) => {
         if(!richiesto && keyRuolo !== 'allievo_quarto_posto') return ''; 
         if(keyRuolo === 'allievo_quarto_posto' && !richiesto) return ''; 
 
@@ -255,34 +255,27 @@ document.addEventListener('DOMContentLoaded', () => {
                                  eqCompleto.soccorritore?.matricola === currentUser.matricola ||
                                  eqCompleto.allievo_quarto_posto?.matricola === currentUser.matricola);
 
-            let conflittoOrario = false;
-            tuttiITurniDelGiorno.forEach(t => {
-                if (t.id !== turno.id) {
-                    const e = t.equipaggio_attuale || {};
-                    const presenteInT = (e.autista?.matricola === currentUser.matricola || 
-                                         e.referente_soreu?.matricola === currentUser.matricola ||
-                                         e.soccorritore?.matricola === currentUser.matricola ||
-                                         e.allievo_quarto_posto?.matricola === currentUser.matricola);
-                    if (presenteInT) {
-                        const inizioA = parseInt(turno.orario?.inizio.replace(':', ''));
-                        const fineA = parseInt(turno.orario?.fine.replace(':', ''));
-                        const inizioB = parseInt(t.orario?.inizio.replace(':', ''));
-                        const fineB = parseInt(t.orario?.fine.replace(':', ''));
-                        
-                        if(inizioA < fineB && fineA > inizioB) {
-                            conflittoOrario = true;
-                        }
-                    }
-                }
-            });
+            const myShifts = fullTurniList.filter(t => {
+                if (t.id === turno.id) return false;
+                const e = t.equipaggio_attuale || {};
+                return (e.autista?.matricola === currentUser.matricola || 
+                        e.referente_soreu?.matricola === currentUser.matricola ||
+                        e.soccorritore?.matricola === currentUser.matricola ||
+                        e.allievo_quarto_posto?.matricola === currentUser.matricola);
+            }).map(t => ({
+                data: t.data,
+                inizio: t.orario?.inizio || "00:00",
+                fine: t.orario?.fine || "00:00"
+            }));
 
+            const riposoCheck = validaRiposi(turno.data, turno.orario?.inizio || "00:00", turno.orario?.fine || "00:00", myShifts);
             const regole = verificaIscrizione(currentUser, turno, keyRuolo);
             let btnStr = '';
 
             if (giaNelTurno) {
                 btnStr = '<span style="font-size:0.75rem; color:var(--neon-green)">Sei in questo equipaggio</span>';
-            } else if (conflittoOrario) {
-                btnStr = '<span style="font-size:0.75rem; color:var(--neon-orange); text-align:right; max-width: 140px; line-height:1.2;">Sei già impegnato in un altro servizio in queste ore</span>';
+            } else if (!riposoCheck.idoneo) {
+                btnStr = `<span style="font-size:0.7rem; color:var(--neon-orange); text-align:right; max-width: 140px; line-height:1.2;" title="${riposoCheck.motivo}">Blocco 118:<br>${riposoCheck.motivo}</span>`;
             } else if (!regole.idoneo) {
                 btnStr = `<span style="font-size:0.75rem; color:var(--text-muted);" title="${regole.motivo}">Non Idoneo</span>`;
             } else {
