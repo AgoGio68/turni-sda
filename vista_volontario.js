@@ -58,8 +58,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const snap = await getDoc(doc(db, "utenti", matricola));
         if (snap.exists()) {
           currentUser = snap.data();
-          userInfoDiv.innerHTML = `Profilo: ${currentUser.nome} ${currentUser.cognome} (${currentUser.matricola}) <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
+          let adminBtnHTML = "";
+          if (currentUser.is_admin) {
+              adminBtnHTML = `<button id="btn-goto-admin" class="btn" style="margin-left:1rem; padding: 0.3rem 0.6rem; font-size:0.8rem; border-color:var(--neon-green); color:var(--neon-green); background:rgba(57,255,20,0.1);">Accedi a Programmazione</button>`;
+          }
+
+          userInfoDiv.innerHTML = `Profilo: ${formattaNominativoUtente(currentUser)} ${adminBtnHTML} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
+          
           document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+          
+          if (currentUser.is_admin) {
+              document.getElementById('btn-goto-admin').addEventListener('click', () => {
+                  window.location.href = "vista_responsabile.html";
+              });
+          }
           initApp();
         } else {
           console.error("Errore Logico: Profilo volontario non trovato in Firestore. Matricola:", matricola);

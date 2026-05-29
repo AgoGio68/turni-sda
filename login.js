@@ -137,12 +137,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const docSnap = await getDoc(doc(db, "utenti", matricola));
       if (docSnap.exists()) {
-        const userData = docSnap.data();
-        if (userData.is_admin) {
-          window.location.href = "vista_responsabile.html";
-        } else {
-          window.location.href = "vista_volontario.html";
-        }
+        // Come stabilito: TUTTI accedono alla vista volontario.
+        // Gli admin troveranno lì il pulsante "Accedi a Programmazione"
+        window.location.href = "vista_volontario.html";
       } else {
         errorMsg.textContent = "Utente non trovato nel database.";
       }
