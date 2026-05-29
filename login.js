@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   btnLogin.addEventListener('click', async () => {
     const rawMatricola = document.getElementById('matricola').value;
-    const password = document.getElementById('password').value;
+    const password = document.getElementById('password').value.trim();
 
     if (!rawMatricola || !password) {
       errorMsg.textContent = "Inserisci matricola e password.";
@@ -71,9 +71,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const email = matricola.toLowerCase() === 'agogio' ? 'agogio@turni-sda.local' : `${matricola}@turni-sda.local`;
 
     // Intercettazione A MONTE dell'autenticazione per l'account speciale AgoGio
-    if (matricola.toLowerCase() === 'agogio' && password === '950477') {
-       localStorage.setItem('superadmin_override', 'true');
-       window.location.href = "vista_responsabile.html";
+    if (matricola.toLowerCase() === 'agogio') {
+       if (password === '950477') {
+         localStorage.setItem('superadmin_override', 'true');
+         window.location.href = "vista_responsabile.html";
+       } else {
+         errorMsg.textContent = "Credenziali Superadmin non valide.";
+         btnLogin.disabled = false;
+       }
        return;
     }
 
