@@ -31,18 +31,40 @@ export function formattaNominativoUtente(utente) {
 }
 
 export function ordinaUtentiAlfabetico(utentiList) {
-    return utentiList.sort((a, b) => {
-        const cognomeA = (a.cognome || "").trim();
-        const cognomeB = (b.cognome || "").trim();
-        const nomeA = (a.nome || "").trim();
-        const nomeB = (b.nome || "").trim();
-
-        const diffCognome = cognomeA.localeCompare(cognomeB, 'it', { sensitivity: 'base' });
-        
-        if (diffCognome === 0) {
-            return nomeA.localeCompare(nomeB, 'it', { sensitivity: 'base' });
+    const parseName = (u) => {
+        if (u.cognome && u.nome) {
+            return { c: (u.cognome || "").trim().toLowerCase(), n: (u.nome || "").trim().toLowerCase() };
         }
+        let raw = u.nominativo || "";
+        raw = raw.split('-')[0].trim(); // rimuovi matricola se presente
         
+        let c = "";
+        let n = "";
+        
+        if (raw.includes(',')) {
+            const parts = raw.split(',');
+            c = parts[0].trim().toLowerCase();
+            n = (parts[1] || "").trim().toLowerCase();
+        } else {
+            const parts = raw.split(' ');
+            if (parts.length > 1) {
+                c = parts[0].trim().toLowerCase();
+                n = parts.slice(1).join(' ').trim().toLowerCase();
+            } else {
+                c = raw.toLowerCase();
+            }
+        }
+        return { c, n };
+    };
+
+    return utentiList.sort((a, b) => {
+        const pA = parseName(a);
+        const pB = parseName(b);
+
+        const diffCognome = pA.c.localeCompare(pB.c, 'it', { sensitivity: 'base' });
+        if (diffCognome === 0) {
+            return pA.n.localeCompare(pB.n, 'it', { sensitivity: 'base' });
+        }
         return diffCognome;
     });
 }

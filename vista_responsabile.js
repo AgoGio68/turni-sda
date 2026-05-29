@@ -127,48 +127,54 @@ document.addEventListener('DOMContentLoaded', () => {
           users = ordinaUtentiAlfabetico(users);
           
           users.forEach(u => {
-              const tr = document.createElement('tr');
-              const isAdmin = !!u.is_admin;
-              const badge = isAdmin ? `<span class="badge" style="background:rgba(57,255,20,0.1); border:1px solid var(--neon-green); color:var(--neon-green);">Admin</span>` : `<span class="badge" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:var(--text-muted);">Utente</span>`;
-              
-              const isSuperAdmin = currentAdminUser && currentAdminUser.superadmin;
-              const currentRuolo = u.ruolo || ''; 
-              const roleOptions = [
-                  { val: '', text: '--- Seleziona Ruolo ---' },
-                  { val: 'superadmin', text: 'Superadmin / Presidente' },
-                  { val: 'admin', text: 'Amministratore / Segreteria' },
-                  { val: 'autista', text: 'Autista (AUT)' },
-                  { val: 'caposquadra', text: 'Caposquadra / Riferimento (RIF)' },
-                  { val: 'soccorritore', text: 'Soccorritore (SOC)' },
-                  { val: 'allievo', text: 'Allievo / Milite in Prova' },
-                  { val: 'kiosk', text: 'Schermo / Monitor Sede' }
-              ];
-              const optionsHtml = roleOptions.map(opt => `<option value="${opt.val}" ${currentRuolo === opt.val ? 'selected' : ''}>${opt.text}</option>`).join('');
-              
-              const isRecentlyUpdated = recentlyUpdatedRoles.has(u.matricola);
-              const extraStyles = isRecentlyUpdated ? 'border-color: var(--neon-green); box-shadow: 0 0 8px var(--neon-green);' : 'border-color: rgba(255,255,255,0.2);';
-              
-              const selectHtml = `<select class="role-select" data-matricola="${u.matricola}" ${!isSuperAdmin ? 'disabled' : ''} style="background: rgba(0,0,0,0.3); color: var(--text-main); padding: 0.3rem; border-radius: 4px; font-size: 0.8rem; margin-left: 0.5rem; outline: none; transition: all 0.3s ease; border: 1px solid transparent; ${extraStyles}">
-                  ${optionsHtml}
-              </select>`;
-              
-              tr.innerHTML = `
-                  <td>${u.matricola}</td>
-                  <td>
-                      <div style="display:flex; align-items:center;">
-                          <span>${formattaNomeDisplay(u.nominativo || formattaNominativoUtente(u))}</span>
-                          ${selectHtml}
-                      </div>
-                  </td>
-                  <td style="font-size:0.8rem; color:var(--text-muted);">${(u.ruoli_areu || []).join(', ')}</td>
-                  <td>${badge}</td>
-                  <td>
-                      <button class="btn toggle-admin-btn" data-matricola="${u.matricola}" data-status="${isAdmin}" style="padding: 0.3rem 0.6rem; font-size:0.75rem; border-color:${isAdmin ? 'var(--neon-red)' : 'var(--neon-green)'}; color:${isAdmin ? 'var(--neon-red)' : 'var(--neon-green)'}">
-                          ${isAdmin ? 'Revoca Admin' : 'Rendi Admin'}
-                      </button>
-                  </td>
-              `;
-              superadminTbody.appendChild(tr);
+              try {
+                  const tr = document.createElement('tr');
+                  const isAdmin = !!u.is_admin;
+                  const badge = isAdmin ? `<span class="badge" style="background:rgba(57,255,20,0.1); border:1px solid var(--neon-green); color:var(--neon-green);">Admin</span>` : `<span class="badge" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:var(--text-muted);">Utente</span>`;
+                  
+                  const isSuperAdmin = currentAdminUser && currentAdminUser.superadmin;
+                  const currentRuolo = u.ruolo || ''; 
+                  const roleOptions = [
+                      { val: '', text: '--- Seleziona Ruolo ---' },
+                      { val: 'superadmin', text: 'Superadmin / Presidente' },
+                      { val: 'admin', text: 'Amministratore / Segreteria' },
+                      { val: 'autista', text: 'Autista (AUT)' },
+                      { val: 'caposquadra', text: 'Caposquadra / Riferimento (RIF)' },
+                      { val: 'soccorritore', text: 'Soccorritore (SOC)' },
+                      { val: 'allievo', text: 'Allievo / Milite in Prova' },
+                      { val: 'kiosk', text: 'Schermo / Monitor Sede' }
+                  ];
+                  const optionsHtml = roleOptions.map(opt => `<option value="${opt.val}" ${currentRuolo === opt.val ? 'selected' : ''}>${opt.text}</option>`).join('');
+                  
+                  const isRecentlyUpdated = recentlyUpdatedRoles.has(u.matricola);
+                  const extraStyles = isRecentlyUpdated ? 'border-color: var(--neon-green); box-shadow: 0 0 8px var(--neon-green);' : 'border-color: rgba(255,255,255,0.2);';
+                  
+                  const selectHtml = `<select class="role-select" data-matricola="${u.matricola}" ${!isSuperAdmin ? 'disabled' : ''} style="background: rgba(0,0,0,0.3); color: var(--text-main); padding: 0.3rem; border-radius: 4px; font-size: 0.8rem; margin-left: 0.5rem; outline: none; transition: all 0.3s ease; border: 1px solid transparent; ${extraStyles}">
+                      ${optionsHtml}
+                  </select>`;
+                  
+                  const ruoliStampati = Array.isArray(u.ruoli_areu) ? u.ruoli_areu.join(', ') : (u.ruoli_areu || '');
+                  
+                  tr.innerHTML = `
+                      <td>${u.matricola}</td>
+                      <td>
+                          <div style="display:flex; align-items:center;">
+                              <span>${formattaNomeDisplay(u.nominativo || formattaNominativoUtente(u))}</span>
+                              ${selectHtml}
+                          </div>
+                      </td>
+                      <td style="font-size:0.8rem; color:var(--text-muted);">${ruoliStampati}</td>
+                      <td>${badge}</td>
+                      <td>
+                          <button class="btn toggle-admin-btn" data-matricola="${u.matricola}" data-status="${isAdmin}" style="padding: 0.3rem 0.6rem; font-size:0.75rem; border-color:${isAdmin ? 'var(--neon-red)' : 'var(--neon-green)'}; color:${isAdmin ? 'var(--neon-red)' : 'var(--neon-green)'}">
+                              ${isAdmin ? 'Revoca Admin' : 'Rendi Admin'}
+                          </button>
+                      </td>
+                  `;
+                  superadminTbody.appendChild(tr);
+              } catch(e) {
+                  console.error("Errore nel rendering dell'utente", u, e);
+              }
           });
           
           document.querySelectorAll('.toggle-admin-btn').forEach(btn => {
