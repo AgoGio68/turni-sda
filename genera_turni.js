@@ -98,23 +98,7 @@ async function run() {
             if(ops === 400) { await batch.commit(); batch = db.batch(); ops = 0; }
         }
 
-        // TS MATTINA (Solo da Lun a Ven)
-        if (!isWeekend) {
-            const idTs = `${yyyy}_${mm}_${dd}_TS_MATTINA`;
-            batch.set(db.collection('turni').doc(idTs), {
-                id_turno: idTs,
-                data: dataStr,
-                fascia: 'MATTINA',
-                orario: { inizio: "07:00", fine: "13:00" },
-                tipo_servizio: "TRASPORTO_SANITARIO",
-                stato_turno: "APERTO",
-                requisiti_equipaggio: { autista_richiesto: true, referente_richiesto: false, soccorritore_richiesto: true, allievo_consentito: false },
-                equipaggio_attuale: getEquipaggioVuoto(),
-                log_modifiche: [{ timestamp: new Date().toISOString(), autore: "script_massivo", azione: "Creazione TS", notifica_inviata: false }]
-            });
-            ops++; creati++;
-            if(ops === 400) { await batch.commit(); batch = db.batch(); ops = 0; }
-        }
+        // I turni di Trasporto Sanitario sono stati rimossi su richiesta.
 
         // ASSISTENZA EVENTI (Solo Sab e Dom)
         if (isWeekend) {
