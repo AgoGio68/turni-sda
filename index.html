@@ -128,20 +128,37 @@
             <li style="margin-bottom: 0.4rem;"><span style="color:#38bdf8; font-size: 1.1rem; vertical-align: middle;">✓</span> <strong>[Conv.]</strong> (Icona Azzurra): Conferma ufficiale del turno (Convalida).</li>
           </ul>
         </li>
-        <li style="margin-top: 1.5rem;"><strong>AUT, RIF, SOC, ALL:</strong> Acronimi standard (Autista, Riferimento, Soccorritore, Allievo).</li>
+        <li style="margin-top: 1.5rem; margin-bottom: 0.8rem;"><strong>Acronimi Operativi:</strong>
+          <ul style="list-style: disc; padding-left: 1.5rem; margin-top: 0.5rem;">
+            <li><strong>AUT:</strong> Autista (Personale abilitato alla conduzione dei mezzi).</li>
+            <li><strong>RIF:</strong> Caposquadra / Riferimento (Responsabile sanitario dell'equipaggio).</li>
+            <li><strong>SOC:</strong> Soccorritore (Volontario certificato addetto al trattamento).</li>
+            <li><strong>ALL:</strong> Allievo (Milite in prova o in affiancamento).</li>
+          </ul>
+        </li>
+        <li style="margin-bottom: 0.8rem; margin-top: 1.5rem;"><strong>🟢 Highlight Verde / Bordo Neon:</strong> Evidenziazione visiva applicata in tempo reale ESCLUSIVAMENTE sul singolo slot orario in cui l'utente attualmente loggato è di servizio.</li>
       </ul>
 
-      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">3. MATRICE DEI PERMESSI</h3>
-      <ul style="list-style: disc; padding-left: 1.5rem; color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
-        <li style="margin-bottom: 0.5rem;"><strong>Volontario:</strong> Visualizzazione calendario e filtri stato personale.</li>
-        <li style="margin-bottom: 0.5rem;"><strong>Admin:</strong> Gestione operativa dei turni e delle coperture.</li>
-        <li style="margin-bottom: 0.5rem;"><strong>Superadmin (AgoGio):</strong> Controllo totale, configurazione Kiosk e gestione anagrafica ruoli con salvataggio immediato sul database.</li>
+      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">3. RUOLI E MATRICE DEI PERMESSI</h3>
+      <ul style="list-style: none; padding: 0; color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
+        <li style="margin-bottom: 1rem;">
+          <strong style="color: var(--neon-green);">Volontario (Stato 1 e 2):</strong> Visualizzazione del Calendario Mensile. Accesso alla Sidebar Dinamica per analizzare i turni (Stato 1) o per filtrare il tabellone mostrando esclusivamente i propri turni personali (Stato 2).
+        </li>
+        <li style="margin-bottom: 1rem;">
+          <strong style="color: #38bdf8;">Admin:</strong> Eredita tutte le funzioni del Volontario. Gestione operativa del pannello di pianificazione per inserire, spostare, validare o cancellare i volontari dai singoli slot e gestire la copertura delle criticità.
+        </li>
+        <li style="margin-bottom: 1rem;">
+          <strong style="color: var(--neon-red);">Superadmin (AgoGio):</strong> Controllo totale e insindacabile. Accesso in esclusiva all'<strong>Anagrafica Volontari</strong> (modifica asincrona in tempo reale dei ruoli utente) e configurazione token Kiosk.
+        </li>
+        <li style="margin-bottom: 1rem;">
+          <strong style="color: var(--neon-orange);">Modalità Kiosk (Stato 3):</strong> Monitor fisso di Sede. Accesso automatizzato (senza credenziali manuali) tramite URL dedicato Magic Link. Mostra una versione in sola lettura a schermo intero del tabellone. Utilizza il font <em>Century Gothic grassetto</em> e colora di <strong>VERDE</strong> brillante i nomi dell'equipaggio attivo.
+        </li>
       </ul>
 
-      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">4. ISTRUZIONI DI ACCESSO</h3>
+      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">4. ISTRUZIONI DI ACCESSO E SICUREZZA</h3>
       <p style="color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
         Per accedere, inserisci la tua <strong>Matricola numerica</strong> e la <strong>Password di default</strong> fornita dalla segreteria.<br><br>
-        <em>Ricorda: dopo il primo login, la modifica della password è un'operazione obbligatoria.</em>
+        <span style="color: var(--neon-red); font-weight: bold;">AVVISO OBBLIGATORIO:</span> <em>Al primo accesso è TASSATIVO modificare la password di default dal proprio profilo per poter sbloccare le funzionalità operative del sistema.</em>
       </p>
 
       <div style="text-align: center; margin-top: 2.5rem;">
@@ -150,6 +167,6 @@
     </div>
   </div>
 
-  <script type="module" src="login.js?v=1.3.12"></script>
+  <script type="module" src="login.js?v=1.3.13"></script>
 </body>
 </html>
