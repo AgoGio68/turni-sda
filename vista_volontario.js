@@ -261,17 +261,17 @@ document.addEventListener('DOMContentLoaded', () => {
           card.style.minHeight = '140px';
           
           // -----------------------------------------------
-          //  HIGHLIGHT: L'utente è in almeno un turno?
+          //  HIGHLIGHT: Calcola il ruolo per OGNI singolo turno
           // -----------------------------------------------
-          let myRolesForDay = [];
+          let myRolesPerFascia = { M: null, P: null, N: null };
           turniDelGiorno.forEach(t => {
               const role = getUserRoleInShift(t);
-              if (role) myRolesForDay.push(role);
+              if (role) {
+                  const oraI = parseInt((t.orario?.inizio || '08:00').split(':')[0]);
+                  const f = oraI < 13 ? 'M' : (oraI < 19 ? 'P' : 'N');
+                  myRolesPerFascia[f] = role;
+              }
           });
-          const isMyDay = myRolesForDay.length > 0;
-          if (isMyDay) {
-              card.classList.add('my-shift');
-          }
           
           let badgeClass = 'incompleto';
           let statoDay = 'Aperto';
@@ -311,10 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const dateParts = dataString.split('-');
           const formattedDate = `${dateParts[2]}/${dateParts[1]}`;
 
-          // Badge ruoli se l'utente è presente in quel giorno
-          const roleBadgesHTML = isMyDay 
-              ? myRolesForDay.map(r => `<span class="my-role-badge">${r}</span>`).join(' ')
-              : '';
+          // I badge ruolo sono ora gestiti a livello di singolo turno (inline card e micro-bar)
 
           // -----------------------------------------------
           //  STATO 2 & 3: Equipaggi inline
@@ -326,11 +323,12 @@ document.addEventListener('DOMContentLoaded', () => {
                   const myRole = getUserRoleInShift(t);
                   const tipo = (t.tipo_servizio||'').replace(/_/g, ' ');
                   const cardClass = myRole ? 'inline-shift-card my-shift-inline' : 'inline-shift-card';
+                  const roleBadge = myRole ? `<span class="my-role-badge">${myRole}</span>` : '';
                   
                   return `
                       <div class="${cardClass}">
                           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
-                              <strong style="font-size:0.7rem; color:var(--text-muted);">${tipo}</strong>
+                              <span><strong style="font-size:0.7rem; color:var(--text-muted);">${tipo}</strong> ${roleBadge}</span>
                               <span style="font-size:0.7rem; color:var(--text-muted);">🕒 ${t.orario?.inizio}-${t.orario?.fine}</span>
                           </div>
                           <ul class="inline-crew-list">${renderInlineEquipaggio(t)}</ul>
@@ -344,18 +342,25 @@ document.addEventListener('DOMContentLoaded', () => {
           // -----------------------------------------------
           if (currentFilter === 'focus') {
               // STATO 1: Macro card classica con micro-bars
+              // Per ogni fascia, aggiungere badge ruolo solo se l'utente è in QUELLA fascia
+              const microBarRow = (label, fasciaKey) => {
+                  const myRole = myRolesPerFascia[fasciaKey];
+                  const badgeHTML = myRole ? ` <span class="my-role-badge">${myRole}</span>` : '';
+                  const barClass = myRole ? `micro-bar ${fasce[fasciaKey] || ''} my-micro-bar` : `micro-bar ${fasce[fasciaKey] || ''}`;
+                  return `
+                      <span class="micro-bar-label">${label}${badgeHTML}</span>
+                      <div class="${barClass}"></div>
+                  `;
+              };
+
               card.innerHTML = `
                 <strong style="font-size: 1.25rem; text-shadow: 0 0 5px rgba(255,255,255,0.2);">${formattedDate}</strong>
                 <span class="badge ${badgeClass}" style="margin-top: 0.25rem; font-size: 0.65rem;">${statoDay}</span>
-                ${roleBadgesHTML}
                 
                 <div class="micro-bars">
-                    <span class="micro-bar-label">Mattina</span>
-                    <div class="micro-bar ${fasce.M || ''}"></div>
-                    <span class="micro-bar-label">Pomeriggio</span>
-                    <div class="micro-bar ${fasce.P || ''}"></div>
-                    <span class="micro-bar-label">Notte</span>
-                    <div class="micro-bar ${fasce.N || ''}"></div>
+                    ${microBarRow('Mattina', 'M')}
+                    ${microBarRow('Pomeriggio', 'P')}
+                    ${microBarRow('Notte', 'N')}
                 </div>
               `;
           } else {
@@ -364,7 +369,6 @@ document.addEventListener('DOMContentLoaded', () => {
               card.innerHTML = `
                 <strong style="font-size: 1.25rem; text-shadow: 0 0 5px rgba(255,255,255,0.2);">${formattedDate}</strong>
                 <span class="badge ${badgeClass}" style="margin-top: 0.25rem; font-size: 0.65rem;">${statoDay}</span>
-                ${roleBadgesHTML}
                 ${inlineCardsHTML}
               `;
           }
