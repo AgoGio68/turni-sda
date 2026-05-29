@@ -2,6 +2,13 @@
  * Modulo di utility per la formattazione e ordinamento globale degli utenti.
  */
 
+export function formattaNomeDisplay(nominativo) {
+    if (!nominativo) return "Sconosciuto";
+    let display = nominativo.split(' - ')[0];
+    display = display.replace(',', '');
+    return display;
+}
+
 export function formattaNominativoUtente(utente) {
     if (!utente || (!utente.cognome && !utente.nome && !utente.matricola)) {
         if (utente && utente.nominativo) return utente.nominativo;

@@ -13,7 +13,7 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, getDocs, updateDoc, doc, onSnapshot, query, writeBatch, getDoc } from "firebase/firestore";
-import { formattaNominativoUtente, ordinaUtentiAlfabetico } from './utils.js';
+import { formattaNominativoUtente, ordinaUtentiAlfabetico, formattaNomeDisplay } from './utils.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -176,9 +176,10 @@ document.addEventListener('DOMContentLoaded', () => {
           
           const formatCell = (membro, richiesto) => {
               if (membro?.matricola) {
+                  const nomeDisplay = formattaNomeDisplay(membro.nominativo);
                   return membro.convalidato_da_admin 
-                      ? `<span style="color:var(--text-main)">${membro.nominativo}</span><br><span style="font-size:0.6rem; color:var(--neon-green);">✓ Conv.</span>`
-                      : `<span style="color:var(--text-main)">${membro.nominativo}</span><br><span style="font-size:0.6rem; color:#38bdf8;">⚠ Attesa</span>`;
+                      ? `<span style="color:var(--text-main)">${nomeDisplay}</span><br><span style="font-size:0.6rem; color:var(--neon-green);">✓ Conv.</span>`
+                      : `<span style="color:var(--text-main)">${nomeDisplay}</span><br><span style="font-size:0.6rem; color:#38bdf8;">⚠ Attesa</span>`;
               }
               if (!richiesto) return `<em style="color:var(--text-muted); font-size: 0.85rem; opacity: 0.5;">N.D.</em>`;
               return `<em style="color:var(--neon-red); font-size: 0.85rem;">Vuoto</em>`;

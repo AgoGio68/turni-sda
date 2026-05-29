@@ -13,7 +13,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, query, onSnapshot, doc, updateDoc, getDoc } from "firebase/firestore";
 import { verificaIscrizione, validaRiposi } from './regole_iscrizione.js';
-import { formattaNominativoUtente } from './utils.js';
+import { formattaNominativoUtente, formattaNomeDisplay } from './utils.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -223,14 +223,15 @@ document.addEventListener('DOMContentLoaded', () => {
               if (membro?.matricola) {
                   const isMe = membro.matricola === currentUser.matricola;
                   // Usa il nominativo già formattato se presente, altrimenti fallback
-                  const nome = membro.nominativo || 'Sconosciuto';
+                  const nomeDb = membro.nominativo || 'Sconosciuto';
+                  const nomeDisplay = nomeDb !== 'Sconosciuto' ? formattaNomeDisplay(nomeDb) : nomeDb;
                   slots.push({
                       label,
-                      nome,
+                      nome: nomeDisplay,
                       isMe,
                       isEmpty: false,
                       // Per ordinamento: estrai cognome dal nominativo "Cognome, Nome - Matricola"
-                      sortKey: nome
+                      sortKey: nomeDb
                   });
               } else {
                   slots.push({
@@ -474,7 +475,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (membro?.matricola) {
             const isMe = membro.matricola === currentUser.matricola;
-            const nomeStampato = isMe ? `<span style="color:var(--neon-green)">Tu (${membro.nominativo})</span>` : membro.nominativo;
+            const nomeDb = membro.nominativo || 'Sconosciuto';
+            const nomeDisplay = nomeDb !== 'Sconosciuto' ? formattaNomeDisplay(nomeDb) : nomeDb;
+            const nomeStampato = isMe ? `<span style="color:var(--neon-green)">Tu (${nomeDisplay})</span>` : nomeDisplay;
             const statoStr = membro.convalidato_da_admin ? '<span class="status-badge status-conv">[CONVALIDATO]</span>' : '<span class="status-badge status-wait">[IN ATTESA]</span>';
             
             return `
