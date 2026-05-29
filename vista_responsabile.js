@@ -88,10 +88,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const snap = await getDoc(doc(db, "utenti", matricola));
             if (snap.exists() && snap.data().is_admin) {
                 currentAdminUser = snap.data();
-                adminInfo.innerHTML = `Admin: ${formattaNominativoUtente(currentAdminUser)} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
+                
+                const isSuper = (currentAdminUser.ruolo === 'superadmin' || currentAdminUser.superadmin === true);
+                if (isSuper) {
+                    currentAdminUser.superadmin = true;
+                    superadminSection.style.display = 'block';
+                    initSuperadminPanel();
+                } else {
+                    superadminSection.style.display = 'none';
+                }
+                
+                adminInfo.innerHTML = `Admin: ${formattaNomeDisplay(currentAdminUser.nominativo || formattaNominativoUtente(currentAdminUser))} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
                 document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
                 
-                superadminSection.style.display = 'none'; // Nascosto
                 initApp();
             } else {
                 console.error("Accesso negato: Permessi non sufficienti per la matricola", matricola);
@@ -147,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   <td>${u.matricola}</td>
                   <td>
                       <div style="display:flex; align-items:center;">
-                          <span>${formattaNominativoUtente(u)}</span>
+                          <span>${formattaNomeDisplay(u.nominativo || formattaNominativoUtente(u))}</span>
                           ${selectHtml}
                       </div>
                   </td>
