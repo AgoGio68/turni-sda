@@ -510,6 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const snap = await getDocs(collection(db, "utenti"));
         allVolunteersCache = snap.docs.map(d => d.data());
       }
+      console.log("Stato lista volontari:", allVolunteersCache);
     } catch(err) {
       console.error("Errore caricamento volontari", err);
     }
@@ -523,18 +524,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if(!modalRoleSelect.options.length) return;
 
     const targetRole = modalRoleSelect.value;
-    const queryText = modalSearch.value.toLowerCase();
+    const search = modalSearch.value.toLowerCase().trim();
+    console.log("Termine ricerca:", search);
     
-    let filtered = allVolunteersCache.filter(u => {
-      const r = u.ruolo || '';
+    let filtered = allVolunteersCache.filter(v => {
+      const r = v.ruolo || '';
       if (targetRole === 'AUT' && r !== 'autista') return false;
       if (targetRole === 'RIF' && r !== 'caposquadra' && r !== 'admin' && r !== 'superadmin') return false;
       if (targetRole === 'SOC' && r !== 'soccorritore') return false;
       if (targetRole === 'ALL' && r !== 'allievo') return false;
       
-      if (queryText) {
-        const name = formattaNomeDisplay(u.nominativo || formattaNominativoUtente(u)).toLowerCase();
-        if (!name.includes(queryText)) return false;
+      if (search) {
+        const cognome = v.cognome || '';
+        const nome = v.nome || '';
+        const nomeVolontario = (cognome + ' ' + nome).toLowerCase().trim();
+        if (!nomeVolontario.includes(search)) return false;
       }
       return true;
     });
