@@ -510,7 +510,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const snap = await getDocs(collection(db, "utenti"));
         allVolunteersCache = snap.docs.map(d => d.data());
       }
-      console.log("Stato lista volontari:", allVolunteersCache);
+      console.log("Dati Volontari Disponibili nel Modale:", allVolunteersCache);
+      if(!allVolunteersCache || allVolunteersCache.length === 0) {
+        console.warn("ATTENZIONE: Array volontari vuoto. Impossibile procedere.");
+        modalVolunteersList.innerHTML = '<p style="color:var(--neon-red); text-align:center;">Nessun dato volontari scaricato dal database.</p>';
+        modalLoading.style.display = 'none';
+        return;
+      }
     } catch(err) {
       console.error("Errore caricamento volontari", err);
     }
@@ -537,8 +543,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (search) {
         const cognome = v.cognome || '';
         const nome = v.nome || '';
-        const nomeVolontario = (cognome + ' ' + nome).toLowerCase().trim();
-        if (!nomeVolontario.includes(search)) return false;
+        const matricola = v.matricola || '';
+        const searchableString = (cognome + " " + nome + " " + matricola).toLowerCase();
+        if (!searchableString.includes(search)) return false;
       }
       return true;
     });
