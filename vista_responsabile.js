@@ -533,51 +533,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderVolunteersList() {
     if(!allVolunteersCache) return;
-    if(!modalRoleSelect.options.length) return;
-
-    const targetRole = modalRoleSelect.value;
-    const search = modalSearch.value.toLowerCase().trim();
-    console.log("Termine ricerca:", search);
     
+    const search = modalSearch.value.toLowerCase().trim();
+    console.log("Stato Ricerca - Lista totale:", allVolunteersCache.length);
+    console.log("Stato Ricerca - Termine:", search);
+
+    // Filtriamo SOLO per nome/cognome, ignorando il ruolo per un momento
     let filtered = allVolunteersCache.filter(v => {
-      const r = v.ruolo || '';
-      if (targetRole === 'AUT' && r !== 'autista') return false;
-      if (targetRole === 'RIF' && r !== 'caposquadra' && r !== 'admin' && r !== 'superadmin') return false;
-      if (targetRole === 'SOC' && r !== 'soccorritore') return false;
-      if (targetRole === 'ALL' && r !== 'allievo') return false;
-      
-      if (search) {
-        const cognome = String(v.cognome || '').toLowerCase();
-        const nome = String(v.nome || '').toLowerCase();
-        const matricola = String(v.matricola || '').toLowerCase();
+        const nominativo = (v.nominativo || '').toLowerCase();
+        const cognome = (v.cognome || '').toLowerCase();
+        const nome = (v.nome || '').toLowerCase();
+        const matricola = (v.matricola || '');
         
-        const isMatch = cognome.includes(search) || 
-                        nome.includes(search) || 
-                        (cognome + ' ' + nome).includes(search) ||
-                        matricola.includes(search);
-        
-        if (!isMatch) return false;
-      }
-      return true;
+        const stringa = `${nominativo} ${cognome} ${nome} ${matricola}`.toLowerCase();
+        return stringa.includes(search);
     });
     
-    filtered = ordinaUtentiAlfabetico(filtered);
-    
+    console.log("Risultati dopo il filtro:", filtered.length);
+
     modalVolunteersList.innerHTML = '';
-    if (filtered.length === 0) {
-      modalVolunteersList.innerHTML = '<p style="color:var(--text-muted); text-align:center;">Nessun volontario trovato per questo ruolo.</p>';
-      return;
-    }
     
     filtered.forEach(u => {
       const div = document.createElement('div');
       div.className = 'volunteer-item';
+      // Stampiamo anche il ruolo grezzo nel div per vedere cosa c'è nel DB
       div.innerHTML = `
         <div>
-          <strong style="color:var(--text-main); font-size:1rem;">${formattaNomeDisplay(u.nominativo || formattaNominativoUtente(u))}</strong><br>
-          <span style="font-size:0.75rem; color:var(--text-muted);">${u.ruoli_areu ? (Array.isArray(u.ruoli_areu) ? u.ruoli_areu.join(', ') : u.ruoli_areu) : ''}</span>
+          <strong>${u.nominativo || u.cognome + ' ' + u.nome}</strong><br>
+          <small style="color:red">DEBUG RUOLO DB: ${u.ruolo}</small>
         </div>
-        <button class="btn" style="padding:0.3rem 0.6rem; font-size:0.8rem; border-color:var(--neon-green); color:var(--neon-green);">Seleziona</button>
+        <button class="btn">Seleziona</button>
       `;
       div.onclick = () => selectVolunteerForSlot(u);
       modalVolunteersList.appendChild(div);
