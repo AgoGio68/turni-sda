@@ -510,9 +510,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const snap = await getDocs(collection(db, "utenti"));
         allVolunteersCache = snap.docs.map(d => d.data());
       }
-      console.log("Dati Volontari Disponibili nel Modale:", allVolunteersCache);
-      console.log("DEBUG_DATI_VOLONTARI:", allVolunteersCache);
-      allVolunteersCache.forEach(v => console.log("Testo indicizzato:", (v.cognome || '') + ' ' + (v.nome || '')));
+      console.log("--- DEBUG STRUTTURA VOLONTARIO ---");
+      if (allVolunteersCache.length > 0) {
+          const v = allVolunteersCache[0];
+          console.log("Chiavi disponibili nell'oggetto:", Object.keys(v));
+          console.log("Valore del primo record:", JSON.stringify(v, null, 2));
+      }
       
       if(!allVolunteersCache || allVolunteersCache.length === 0) {
         console.warn("ATTENZIONE: Array volontari vuoto. Impossibile procedere.");
