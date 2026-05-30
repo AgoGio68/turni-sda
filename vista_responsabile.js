@@ -304,14 +304,18 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.action-btn').forEach(btn => {
           btn.addEventListener('click', (e) => {
             const idTurno = e.currentTarget.getAttribute('data-id');
-            let azione = '';
+            const turnoObj = turniOriginali.get(idTurno);
             
-            if(e.currentTarget.classList.contains('insert')) azione = 'Inserimento forzato da Admin';
+            if(e.currentTarget.classList.contains('insert')) {
+                if(typeof openInsertModal === 'function') openInsertModal(turnoObj);
+                return;
+            }
+
+            let azione = '';
             if(e.currentTarget.classList.contains('move')) azione = "Spostamento d'ufficio da Admin";
             if(e.currentTarget.classList.contains('delete')) azione = 'Cancellazione operatore da Admin';
             if(e.currentTarget.classList.contains('validate')) azione = 'Convalida equipaggio da Admin';
 
-            const turnoObj = turniOriginali.get(idTurno);
             const currentEq = turnoObj.equipaggio_attuale || {};
             
             let payloadModifica = null;
@@ -428,4 +432,162 @@ document.addEventListener('DOMContentLoaded', () => {
 
       document.getElementById('btn-save').addEventListener('click', confermaEInviaNotifiche);
   }
+
+  // --- LOGICA MODALE INSERIMENTO ---
+  let modalTurnoId = null;
+  let allVolunteersCache = null;
+
+  const modalOverlay = document.getElementById('modal-inserimento');
+  const modalTitle = document.getElementById('modal-title');
+  const modalRoleSelect = document.getElementById('modal-role-select');
+  const modalSearch = document.getElementById('modal-search');
+  const modalVolunteersList = document.getElementById('modal-volunteers-list');
+  const modalLoading = document.getElementById('modal-loading');
+
+  window.openInsertModal = function(turnoObj) {
+    if(!modalOverlay) return;
+    modalTurnoId = turnoObj.id;
+    const targetDate = `${turnoObj.data} ${turnoObj.orario?.inizio||''}`;
+    
+    modalRoleSelect.innerHTML = '';
+    const req = turnoObj.requisiti_equipaggio || {};
+    const eq = turnoObj.equipaggio_attuale || {};
+    
+    const options = [];
+    if (req.autista_richiesto) options.push({val: 'AUT', label: 'Autista', field: 'autista', occ: eq.autista?.matricola});
+    if (req.referente_richiesto) options.push({val: 'RIF', label: 'Referente SOREU', field: 'referente_soreu', occ: eq.referente_soreu?.matricola});
+    if (req.soccorritore_richiesto) options.push({val: 'SOC', label: 'Soccorritore', field: 'soccorritore', occ: eq.soccorritore?.matricola});
+    if (req.allievo_consentito) options.push({val: 'ALL', label: 'Allievo', field: 'allievo_quarto_posto', occ: eq.allievo_quarto_posto?.matricola});
+    
+    if(options.length === 0) {
+      alert("Questo turno non ha requisiti configurati.");
+      return;
+    }
+
+    options.forEach(opt => {
+      const status = opt.occ ? '(Occupato)' : '(Libero)';
+      modalRoleSelect.innerHTML += `<option value="${opt.val}" data-field="${opt.field}">${opt.label} ${status}</option>`;
+    });
+    
+    const updateModalTitle = () => {
+      if(!modalRoleSelect.options.length) return;
+      const roleLabel = modalRoleSelect.options[modalRoleSelect.selectedIndex].text.split(' (')[0];
+      modalTitle.textContent = `Inserisci ${roleLabel} per il turno ${targetDate}`;
+    };
+    
+    modalRoleSelect.onchange = () => {
+      updateModalTitle();
+      loadAndFilterVolunteers();
+    };
+    
+    updateModalTitle();
+    modalSearch.value = '';
+    modalOverlay.classList.add('active');
+    modalOverlay.style.display = 'flex';
+    
+    loadAndFilterVolunteers();
+  };
+
+  if(document.getElementById('modal-close')) {
+    document.getElementById('modal-close').onclick = () => {
+      modalOverlay.classList.remove('active');
+      setTimeout(() => modalOverlay.style.display = 'none', 300);
+    };
+  }
+
+  if(modalSearch) {
+    modalSearch.addEventListener('input', () => {
+      renderVolunteersList();
+    });
+  }
+
+  async function loadAndFilterVolunteers() {
+    modalVolunteersList.innerHTML = '';
+    modalLoading.style.display = 'block';
+    
+    try {
+      if (!allVolunteersCache) {
+        const snap = await getDocs(collection(db, "utenti"));
+        allVolunteersCache = snap.docs.map(d => d.data());
+      }
+    } catch(err) {
+      console.error("Errore caricamento volontari", err);
+    }
+    
+    modalLoading.style.display = 'none';
+    renderVolunteersList();
+  }
+
+  function renderVolunteersList() {
+    if(!allVolunteersCache) return;
+    if(!modalRoleSelect.options.length) return;
+
+    const targetRole = modalRoleSelect.value;
+    const queryText = modalSearch.value.toLowerCase();
+    
+    let filtered = allVolunteersCache.filter(u => {
+      const r = u.ruolo || '';
+      if (targetRole === 'AUT' && r !== 'autista') return false;
+      if (targetRole === 'RIF' && r !== 'caposquadra' && r !== 'admin' && r !== 'superadmin') return false;
+      if (targetRole === 'SOC' && r !== 'soccorritore') return false;
+      if (targetRole === 'ALL' && r !== 'allievo') return false;
+      
+      if (queryText) {
+        const name = formattaNomeDisplay(u.nominativo || formattaNominativoUtente(u)).toLowerCase();
+        if (!name.includes(queryText)) return false;
+      }
+      return true;
+    });
+    
+    filtered = ordinaUtentiAlfabetico(filtered);
+    
+    modalVolunteersList.innerHTML = '';
+    if (filtered.length === 0) {
+      modalVolunteersList.innerHTML = '<p style="color:var(--text-muted); text-align:center;">Nessun volontario trovato per questo ruolo.</p>';
+      return;
+    }
+    
+    filtered.forEach(u => {
+      const div = document.createElement('div');
+      div.className = 'volunteer-item';
+      div.innerHTML = `
+        <div>
+          <strong style="color:var(--text-main); font-size:1rem;">${formattaNomeDisplay(u.nominativo || formattaNominativoUtente(u))}</strong><br>
+          <span style="font-size:0.75rem; color:var(--text-muted);">${u.ruoli_areu ? (Array.isArray(u.ruoli_areu) ? u.ruoli_areu.join(', ') : u.ruoli_areu) : ''}</span>
+        </div>
+        <button class="btn" style="padding:0.3rem 0.6rem; font-size:0.8rem; border-color:var(--neon-green); color:var(--neon-green);">Seleziona</button>
+      `;
+      div.onclick = () => selectVolunteerForSlot(u);
+      modalVolunteersList.appendChild(div);
+    });
+  }
+
+  async function selectVolunteerForSlot(user) {
+    const selectedOption = modalRoleSelect.options[modalRoleSelect.selectedIndex];
+    const field = selectedOption.getAttribute('data-field');
+    const isOccupied = selectedOption.text.includes('(Occupato)');
+    
+    if (isOccupied) {
+      if (!confirm("Questo slot è già occupato. Sovrascrivere il volontario attuale?")) return;
+    }
+    
+    const updateData = {};
+    updateData[`equipaggio_attuale.${field}`] = {
+      matricola: user.matricola,
+      nominativo: user.nominativo || formattaNominativoUtente(user),
+      convalidato_da_admin: true
+    };
+    
+    try {
+      modalLoading.style.display = 'block';
+      await updateDoc(doc(db, "turni", modalTurnoId), updateData);
+      modalLoading.style.display = 'none';
+      if(document.getElementById('modal-close')) document.getElementById('modal-close').click();
+    } catch(e) {
+      modalLoading.style.display = 'none';
+      console.error(e);
+      alert("Errore durante l'aggiornamento del turno.");
+    }
+  }
+
 });
