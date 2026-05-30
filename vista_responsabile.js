@@ -511,6 +511,9 @@ document.addEventListener('DOMContentLoaded', () => {
         allVolunteersCache = snap.docs.map(d => d.data());
       }
       console.log("Dati Volontari Disponibili nel Modale:", allVolunteersCache);
+      console.log("DEBUG_DATI_VOLONTARI:", allVolunteersCache);
+      allVolunteersCache.forEach(v => console.log("Testo indicizzato:", (v.cognome || '') + ' ' + (v.nome || '')));
+      
       if(!allVolunteersCache || allVolunteersCache.length === 0) {
         console.warn("ATTENZIONE: Array volontari vuoto. Impossibile procedere.");
         modalVolunteersList.innerHTML = '<p style="color:var(--neon-red); text-align:center;">Nessun dato volontari scaricato dal database.</p>';
@@ -541,11 +544,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (targetRole === 'ALL' && r !== 'allievo') return false;
       
       if (search) {
-        const cognome = v.cognome || '';
-        const nome = v.nome || '';
-        const matricola = v.matricola || '';
-        const searchableString = (cognome + " " + nome + " " + matricola).toLowerCase();
-        if (!searchableString.includes(search)) return false;
+        const cognome = String(v.cognome || '').toLowerCase();
+        const nome = String(v.nome || '').toLowerCase();
+        const matricola = String(v.matricola || '').toLowerCase();
+        
+        const isMatch = cognome.includes(search) || 
+                        nome.includes(search) || 
+                        (cognome + ' ' + nome).includes(search) ||
+                        matricola.includes(search);
+        
+        if (!isMatch) return false;
       }
       return true;
     });
