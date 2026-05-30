@@ -535,32 +535,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if(!allVolunteersCache) return;
     
     const search = modalSearch.value.toLowerCase().trim();
-    console.log("Stato Ricerca - Lista totale:", allVolunteersCache.length);
-    console.log("Stato Ricerca - Termine:", search);
-
-    // Filtriamo SOLO per nome/cognome, ignorando il ruolo per un momento
+    
+    // Filtro "Flat" (senza guardare i ruoli per ora)
     let filtered = allVolunteersCache.filter(v => {
-        const nominativo = (v.nominativo || '').toLowerCase();
-        const cognome = (v.cognome || '').toLowerCase();
-        const nome = (v.nome || '').toLowerCase();
-        const matricola = (v.matricola || '');
-        
-        const stringa = `${nominativo} ${cognome} ${nome} ${matricola}`.toLowerCase();
-        return stringa.includes(search);
+      const nomeCompleto = `${v.nome || ''} ${v.cognome || ''}`.toLowerCase();
+      return nomeCompleto.includes(search);
     });
     
-    console.log("Risultati dopo il filtro:", filtered.length);
-
     modalVolunteersList.innerHTML = '';
     
     filtered.forEach(u => {
       const div = document.createElement('div');
       div.className = 'volunteer-item';
-      // Stampiamo anche il ruolo grezzo nel div per vedere cosa c'è nel DB
       div.innerHTML = `
         <div>
-          <strong>${u.nominativo || u.cognome + ' ' + u.nome}</strong><br>
-          <small style="color:red">DEBUG RUOLO DB: ${u.ruolo}</small>
+          <strong>${u.nome || ''} ${u.cognome || ''}</strong><br>
+          <small>Matricola: ${u.matricola || 'N/A'}</small>
         </div>
         <button class="btn">Seleziona</button>
       `;
