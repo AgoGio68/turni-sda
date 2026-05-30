@@ -180,6 +180,30 @@
       .filter-btn-group { flex-direction: row; flex-wrap: wrap; }
       .filter-btn { flex: 1; min-width: 120px; }
     }
+
+    /* FAB Chiusura Dettaglio */
+    .fab-close {
+      position: fixed; top: 20px; right: 20px; z-index: 3000;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: white;
+      display: flex; justify-content: center; align-items: center;
+      cursor: pointer;
+      opacity: 0; pointer-events: none;
+      transform: scale(0.8);
+      transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .fab-close svg { width: 20px; height: 20px; }
+    .fab-close.active {
+      opacity: 1; pointer-events: all; transform: scale(1);
+    }
+    .fab-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.05);
+    }
   </style>
 </head>
 <body>
@@ -235,6 +259,13 @@
     </div>
   </div>
 
-  <script type="module" src="vista_volontario.js?v=1.3.9"></script>
+  <button id="btn-close-details" class="fab-close" aria-label="Chiudi dettaglio">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  </button>
+
+  <script type="module" src="vista_volontario.js?v=1.3.14"></script>
 </body>
 </html>

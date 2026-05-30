@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const bsOverlay = document.getElementById('bs-overlay');
       const bsTitle = document.getElementById('bs-title');
       const bsContent = document.getElementById('bs-content');
+      const btnCloseDetails = document.getElementById('btn-close-details');
 
       let turniList = [];
       let currentSelectedDate = null;
@@ -191,9 +192,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const closeBottomSheet = () => {
         bottomSheet.classList.remove('active');
         bsOverlay.classList.remove('active');
+        if (btnCloseDetails) btnCloseDetails.classList.remove('active');
         currentSelectedDate = null;
       };
       bsOverlay.addEventListener('click', closeBottomSheet);
+      if (btnCloseDetails) btnCloseDetails.addEventListener('click', closeBottomSheet);
 
       // =====================================================
       //  UTILITY: Verifica se l'utente è in un turno
@@ -418,6 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderMicroDay(dataString);
             bottomSheet.classList.add('active');
             bsOverlay.classList.add('active');
+            if (btnCloseDetails) btnCloseDetails.classList.add('active');
           });
 
           calendar.appendChild(card);
