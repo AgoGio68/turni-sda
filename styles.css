@@ -260,3 +260,30 @@ h2 { color: var(--text-main); margin-top: 0; }
   background: rgba(57, 255, 20, 0.1);
   border-color: var(--neon-green);
 }
+
+/* Colori dinamici in base allo stato del turno per i volontari */
+.slot-prenotato {
+  background-color: #FFD700 !important;
+  color: #0b0f19 !important;
+  border-radius: 8px;
+  margin: 0.25rem 0;
+  padding: 0.75rem !important;
+  border: none !important;
+}
+.slot-prenotato * {
+  color: #0b0f19 !important;
+  border-color: rgba(11, 15, 25, 0.3) !important;
+}
+
+.slot-confermato {
+  background-color: #32CD32 !important;
+  color: #0b0f19 !important;
+  border-radius: 8px;
+  margin: 0.25rem 0;
+  padding: 0.75rem !important;
+  border: none !important;
+}
+.slot-confermato * {
+  color: #0b0f19 !important;
+  border-color: rgba(11, 15, 25, 0.3) !important;
+}

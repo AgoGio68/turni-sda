@@ -100,23 +100,7 @@ async function run() {
 
         // I turni di Trasporto Sanitario sono stati rimossi su richiesta.
 
-        // ASSISTENZA EVENTI (Solo Sab e Dom)
-        if (isWeekend) {
-            const idAssistenza = `${yyyy}_${mm}_${dd}_ASSISTENZA`;
-            batch.set(db.collection('turni').doc(idAssistenza), {
-                id_turno: idAssistenza,
-                data: dataStr,
-                fascia: 'POMERIGGIO',
-                orario: { inizio: "14:00", fine: "19:00" },
-                tipo_servizio: "ASSISTENZA_EVENTI",
-                stato_turno: "APERTO",
-                requisiti_equipaggio: { autista_richiesto: true, referente_richiesto: true, soccorritore_richiesto: true, allievo_consentito: false },
-                equipaggio_attuale: getEquipaggioVuoto(),
-                log_modifiche: [{ timestamp: new Date().toISOString(), autore: "script_massivo", azione: "Creazione Eventi", notifica_inviata: false }]
-            });
-            ops++; creati++;
-            if(ops === 400) { await batch.commit(); batch = db.batch(); ops = 0; }
-        }
+
     }
 
     if(ops > 0) { await batch.commit(); }

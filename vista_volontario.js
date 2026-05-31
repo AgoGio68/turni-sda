@@ -229,9 +229,10 @@ document.addEventListener('DOMContentLoaded', () => {
                   // Usa il nominativo già formattato se presente, altrimenti fallback
                   const nomeDb = membro.nominativo || 'Sconosciuto';
                   const nomeDisplay = nomeDb !== 'Sconosciuto' ? formattaNomeDisplay(nomeDb) : nomeDb;
+                  const textColor = membro.convalidato_da_admin ? '#32CD32' : '#FFD700';
                   slots.push({
                       label,
-                      nome: nomeDisplay,
+                      nome: `<span style="color:${textColor}; font-weight:bold;">${nomeDisplay}</span>`,
                       isMe,
                       isEmpty: false,
                       // Per ordinamento: estrai cognome dal nominativo "Cognome, Nome - Matricola"
@@ -475,6 +476,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 await iscriviti(idTurno, ruolo);
             });
         });
+
+        document.querySelectorAll('.btn-remove-vol').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const idTurno = e.currentTarget.getAttribute('data-turno');
+                const ruolo = e.currentTarget.getAttribute('data-ruolo');
+                await rimuoviVolontario(idTurno, ruolo);
+            });
+        });
       };
 
       // =====================================================
@@ -488,11 +497,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const isMe = String(membro.matricola) === String(currentUser.matricola);
             const nomeDb = membro.nominativo || 'Sconosciuto';
             const nomeDisplay = nomeDb !== 'Sconosciuto' ? formattaNomeDisplay(nomeDb) : nomeDb;
-            const nomeStampato = isMe ? `<span style="color:var(--neon-green)">Tu (${nomeDisplay})</span>` : nomeDisplay;
+            const textColor = membro.convalidato_da_admin ? '#32CD32' : '#FFD700';
+            const textContent = isMe ? `Tu (${nomeDisplay})` : nomeDisplay;
+            
+            const isAdmin = currentUser.ruolo === 'admin' || currentUser.ruolo === 'superadmin' || currentUser.is_admin === true;
+            const btnRemoveHtml = isAdmin ? `<button class="btn-remove-vol" data-turno="${turno.id}" data-ruolo="${keyRuolo}" title="Rimuovi Volontario" style="background:transparent; border:none; cursor:pointer; margin-left:0.5rem;">❌</button>` : '';
+
+            const nomeStampato = `<span style="color:${textColor}; font-weight:bold;">${textContent}</span>${btnRemoveHtml}`;
             const statoStr = membro.convalidato_da_admin ? '<span class="status-badge status-conv">[CONVALIDATO]</span>' : '<span class="status-badge status-wait">[IN ATTESA]</span>';
+            const rowColorClass = membro.convalidato_da_admin ? 'slot-confermato' : 'slot-prenotato';
             
             return `
-                <div class="slot-row">
+                <div class="slot-row ${rowColorClass}">
                     <div class="slot-info">
                         <span class="slot-icon">${icon}</span>
                         <div>
@@ -557,8 +573,41 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       // =====================================================
-      //  CORE: ISCRIZIONE (INVARIATA)
+      //  CORE: ISCRIZIONE E RIMOZIONE
       // =====================================================
+      const rimuoviVolontario = async (idTurno, ruolo) => {
+        if(!confirm("Sei sicuro di voler rimuovere questo volontario dal turno?")) return;
+        const turnoTarget = turniList.find(t => t.id === idTurno);
+        if (!turnoTarget) return;
+
+        try {
+            const docRef = doc(db, "turni", idTurno);
+            const eq = { ...turnoTarget.equipaggio_attuale };
+            
+            if (ruolo === 'autista') eq.autista = { matricola: null, nominativo: null, convalidato_da_admin: false };
+            if (ruolo === 'referente_soreu') eq.referente_soreu = { matricola: null, nominativo: null, convalidato_da_admin: false };
+            if (ruolo === 'soccorritore') eq.soccorritore = { matricola: null, nominativo: null, convalidato_da_admin: false };
+            if (ruolo === 'allievo_quarto_posto') eq.allievo_quarto_posto = { matricola: null, nominativo: null, convalidato_da_admin: false };
+
+            const logs = turnoTarget.log_modifiche || [];
+            logs.push({
+                timestamp: new Date().toISOString(),
+                autore: currentUser.matricola,
+                azione: `Rimozione forzata da admin dello slot ${ruolo.replace(/_/g, ' ')}`,
+                notifica_inviata: false
+            });
+
+            await updateDoc(docRef, {
+                equipaggio_attuale: eq,
+                log_modifiche: logs
+            });
+            
+        } catch (err) {
+            console.error("Errore rimozione:", err);
+            alert("Si è verificato un errore di rete durante la rimozione.");
+        }
+      };
+
       const iscriviti = async (idTurno, ruolo) => {
         const turnoTarget = turniList.find(t => t.id === idTurno);
         if (!turnoTarget) return;

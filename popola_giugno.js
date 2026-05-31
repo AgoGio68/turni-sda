@@ -123,23 +123,7 @@ async function run() {
             count++;
         }
 
-        // 4. ASSISTENZA EVENTI (Solo Sabato e Domenica)
-        if (isWeekend) {
-            const idAssistenza = `${yyyy}_${mm}_${dd}_ASSISTENZA`;
-            batch.set(doc(db, "turni", idAssistenza), {
-                id_turno: idAssistenza,
-                data: dataStr,
-                orario: { inizio: "14:00", fine: "19:00" },
-                tipo_servizio: "ASSISTENZA_EVENTI",
-                stato_turno: "APERTO",
-                /* Adattamento struttura rigida a 4 slot per la regola 'autista + 2 soccorritori': 
-                   Utilizziamo il referente SOREU come secondo posto soccorritore a livello formale UI */
-                requisiti_equipaggio: { autista_richiesto: true, referente_richiesto: true, soccorritore_richiesto: true, allievo_consentito: false },
-                equipaggio_attuale: { autista: {...slotVuoto}, referente_soreu: {...slotVuoto}, soccorritore: {...slotVuoto}, allievo_quarto_posto: {...slotVuoto} },
-                log_modifiche: [{ timestamp: new Date().toISOString(), autore: "script_massivo", azione: "Generazione batch Eventi", notifica_inviata: false }]
-            });
-            count++;
-        }
+
     }
 
     console.log("=================================================");

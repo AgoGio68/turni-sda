@@ -12,7 +12,7 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 */
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, getDocs, updateDoc, doc, onSnapshot, query, writeBatch, getDoc } from "firebase/firestore";
+import { getFirestore, collection, getDocs, updateDoc, doc, onSnapshot, query, writeBatch, getDoc, runTransaction, setDoc, deleteDoc } from "firebase/firestore";
 import { formattaNominativoUtente, ordinaUtentiAlfabetico, formattaNomeDisplay } from './utils.js';
 
 const firebaseConfig = {
@@ -37,6 +37,7 @@ let modificheSospese = [];
 let turniOriginali = new Map();
 let currentAdminUser = null;
 let recentlyUpdatedRoles = new Set();
+let pendingMoveData = null;
 
 const stagingBar = document.getElementById('staging-bar');
 const stagingCount = document.getElementById('staging-count');
@@ -103,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
                 
                 initApp();
+                initPresence();
             } else {
                 console.error("Accesso negato: Permessi non sufficienti per la matricola", matricola);
                 alert("Accesso negato: non hai i permessi di amministratore per questa vista.");
@@ -116,6 +118,42 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error("Errore in onAuthStateChanged Responsabile:", e.code, e.message);
     }
   });
+  
+  // 1.5. Presenza Live Admin
+  function initPresence() {
+      const presenceRef = doc(db, 'utenti', currentAdminUser.matricola);
+      
+      const updatePresence = () => {
+          setDoc(presenceRef, {
+              last_active: Date.now()
+          }, { merge: true }).catch(e => console.error("Presence update failed:", e));
+      };
+      
+      updatePresence();
+      setInterval(updatePresence, 30000); // 30 seconds heartbeat
+      
+      const presenceQuery = query(collection(db, 'utenti'));
+      onSnapshot(presenceQuery, (snap) => {
+          const now = Date.now();
+          const activeAdmins = [];
+          snap.forEach(d => {
+              const data = d.data();
+              // Check if they are an admin and active
+              if (d.id !== currentAdminUser.matricola && data.last_active > now - 60000 && (data.ruolo === 'admin' || data.ruolo === 'superadmin' || data.is_admin || data.superadmin)) {
+                  activeAdmins.push(data.nominativo || formattaNominativoUtente(data));
+              }
+          });
+          
+          const container = document.getElementById('active-admins');
+          if (container) {
+              if (activeAdmins.length > 0) {
+                  container.innerHTML = `🟢 Altri admin online: ${activeAdmins.map(n => formattaNomeDisplay(n)).join(', ')}`;
+              } else {
+                  container.innerHTML = `Nessun altro admin online in questo momento.`;
+              }
+          }
+      });
+  }
   
   // 2. Pannello Superadmin (Solo AgoGio)
   
@@ -236,9 +274,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const renderTable = () => {
         tbody.innerHTML = '';
-        const turniList = Array.from(turniOriginali.values()).sort((a,b) => (a.data||'').localeCompare(b.data||''));
+        const turniList = Array.from(turniOriginali.values()).sort((a,b) => {
+            const cmp = (a.data||'').localeCompare(b.data||'');
+            if (cmp !== 0) return cmp;
+            return (a.orario?.inizio||'').localeCompare(b.orario?.inizio||'');
+        });
 
-        turniList.forEach(turno => {
+        if (turniList.length === 0) return;
+
+        const EPOCH = new Date('2024-05-31T20:00:00').getTime();
+        const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+        
+        const getCycleIndex = (turno) => {
+            const tDate = new Date(`${turno.data}T${turno.orario?.inizio || "00:00"}:00`).getTime();
+            return Math.floor((tDate - EPOCH) / WEEK_MS);
+        };
+
+        const firstCycleIndex = getCycleIndex(turniList[0]);
+        const teams = ['A', 'B', 'C'];
+
+        turniList.forEach((turno, index) => {
           const tr = document.createElement('tr');
           const isStaged = modificheSospese.some(m => m.idTurno === turno.id);
           if (isStaged) {
@@ -248,12 +303,17 @@ document.addEventListener('DOMContentLoaded', () => {
           const eq = turno.equipaggio_attuale || {};
           const req = turno.requisiti_equipaggio || {};
           
-          const formatCell = (membro, richiesto) => {
+          const formatCell = (membro, richiesto, roleKey) => {
               if (membro?.matricola) {
                   const nomeDisplay = formattaNomeDisplay(membro.nominativo);
+                  const nameColor = membro.convalidato_da_admin ? '#32CD32' : '#FFD700';
+                  
+                  const isAdmin = currentAdminUser?.ruolo === 'admin' || currentAdminUser?.ruolo === 'superadmin' || currentAdminUser?.is_admin === true || currentAdminUser?.superadmin === true;
+                  const btnRemoveHtml = isAdmin ? `<button class="admin-remove-vol" data-turno="${turno.id}" data-ruolo="${roleKey}" title="Rimuovi Volontario" style="background:transparent; border:none; cursor:pointer; margin-left:0.3rem; color:var(--neon-red); font-size:1rem; padding:0;">❌</button>` : '';
+
                   return membro.convalidato_da_admin 
-                      ? `<span style="color:var(--text-main)">${nomeDisplay}</span><br><span style="font-size:0.6rem; color:var(--neon-green);">✓ Conv.</span>`
-                      : `<span style="color:var(--text-main)">${nomeDisplay}</span><br><span style="font-size:0.6rem; color:#38bdf8;">⚠ Attesa</span>`;
+                      ? `<span style="color:${nameColor}; font-weight:bold;">${nomeDisplay}</span>${btnRemoveHtml}<br><span style="font-size:0.6rem; color:var(--neon-green);">✓ Conv.</span>`
+                      : `<span style="color:${nameColor}; font-weight:bold;">${nomeDisplay}</span>${btnRemoveHtml}<br><span style="font-size:0.6rem; color:#38bdf8;">⚠ Attesa</span>`;
               }
               if (!richiesto) return `<em style="color:var(--text-muted); font-size: 0.85rem; opacity: 0.5;">N.D.</em>`;
               return `<em style="color:var(--neon-red); font-size: 0.85rem;">Vuoto</em>`;
@@ -279,14 +339,35 @@ document.addEventListener('DOMContentLoaded', () => {
           const dateParts = turno.data.split('-');
           const fDate = `${dateParts[2]}/${dateParts[1]}`;
 
+          const currentCycleIndex = getCycleIndex(turno);
+          const diffWeeks = currentCycleIndex - firstCycleIndex;
+          let startIdx = teams.indexOf(window.startingTeam || 'A');
+          if (startIdx === -1) startIdx = 0;
+          
+          const currentTeamIdx = (((startIdx + diffWeeks) % 3) + 3) % 3;
+          const teamLet = teams[currentTeamIdx];
+          
+          let squadraHtml = '';
+          if (index === 0) {
+              squadraHtml = `
+                <select id="start-team-selector" style="background:rgba(0,0,0,0.3); color:var(--text-main); border:1px solid var(--border-glass); padding:0.2rem; border-radius:4px; font-weight:bold; font-size:1.1rem; width: 60px;">
+                  <option value="A" ${window.startingTeam === 'A' ? 'selected' : ''}>A</option>
+                  <option value="B" ${window.startingTeam === 'B' ? 'selected' : ''}>B</option>
+                  <option value="C" ${window.startingTeam === 'C' ? 'selected' : ''}>C</option>
+                </select>
+              `;
+          } else {
+              squadraHtml = `<strong style="font-size: 1.2rem; color: var(--primary-neon); margin-left: 0.5rem;">${teamLet}</strong>`;
+          }
+
           tr.innerHTML = `
+            <td>${squadraHtml}</td>
             <td><strong style="color: var(--text-main); font-size: 1.1rem;">${fDate}</strong><br><span style="font-size:0.85rem; color:var(--text-muted)">${turno.orario?.inizio || ''}-${turno.orario?.fine || ''}</span></td>
-            <td style="font-size:0.85rem;">${(turno.tipo_servizio || '').replace('_', ' ')}</td>
             <td><span class="badge ${badgeClass}" style="font-size: 0.65rem;">${stato}</span></td>
-            <td>${formatCell(eq.autista, req.autista_richiesto)}</td>
-            <td>${formatCell(eq.referente_soreu, req.referente_richiesto)}</td>
-            <td>${formatCell(eq.soccorritore, req.soccorritore_richiesto)}</td>
-            <td>${formatCell(eq.allievo_quarto_posto, req.allievo_consentito)}</td>
+            <td>${formatCell(eq.autista, req.autista_richiesto, 'autista')}</td>
+            <td>${formatCell(eq.referente_soreu, req.referente_richiesto, 'referente_soreu')}</td>
+            <td>${formatCell(eq.soccorritore, req.soccorritore_richiesto, 'soccorritore')}</td>
+            <td>${formatCell(eq.allievo_quarto_posto, req.allievo_consentito, 'allievo_quarto_posto')}</td>
             <td style="display:flex; gap: 0.4rem; flex-wrap: wrap;">
               <button class="btn action-btn insert" data-id="${turno.id}" style="padding: 0.3rem 0.4rem; font-size: 0.7rem; border-color:var(--neon-green)">➕ Ins.</button>
               <button class="btn action-btn move" data-id="${turno.id}" style="padding: 0.3rem 0.4rem; font-size: 0.7rem; border-color:var(--neon-orange); color:var(--text-main)">🔄 Spos.</button>
@@ -297,10 +378,61 @@ document.addEventListener('DOMContentLoaded', () => {
           tbody.appendChild(tr);
         });
 
+        const startTeamSelector = document.getElementById('start-team-selector');
+        if (startTeamSelector) {
+            startTeamSelector.addEventListener('change', (e) => {
+                window.startingTeam = e.target.value;
+                renderTable();
+            });
+        }
+
+        document.querySelectorAll('.admin-remove-vol').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const idTurno = e.currentTarget.getAttribute('data-turno');
+                const ruolo = e.currentTarget.getAttribute('data-ruolo');
+                await rimuoviVolontarioImprevisto(idTurno, ruolo);
+            });
+        });
+
         attachActionListeners();
       };
 
+      const rimuoviVolontarioImprevisto = async (idTurno, ruolo) => {
+        if(!confirm("Sei sicuro di voler rimuovere il volontario dal turno?")) return;
+        const turnoTarget = turniOriginali.get(idTurno);
+        if (!turnoTarget) return;
+
+        try {
+            const docRef = doc(db, "turni", idTurno);
+            const eq = { ...turnoTarget.equipaggio_attuale };
+            
+            if (ruolo === 'autista') eq.autista = { matricola: null, nominativo: null, convalidato_da_admin: false };
+            if (ruolo === 'referente_soreu') eq.referente_soreu = { matricola: null, nominativo: null, convalidato_da_admin: false };
+            if (ruolo === 'soccorritore') eq.soccorritore = { matricola: null, nominativo: null, convalidato_da_admin: false };
+            if (ruolo === 'allievo_quarto_posto') eq.allievo_quarto_posto = { matricola: null, nominativo: null, convalidato_da_admin: false };
+
+            const logs = turnoTarget.log_modifiche || [];
+            logs.push({
+                timestamp: new Date().toISOString(),
+                autore: currentAdminUser.matricola,
+                azione: `Rimozione imprevista admin per slot ${ruolo.replace(/_/g, ' ')}`,
+                notifica_inviata: false
+            });
+
+            await updateDoc(docRef, {
+                equipaggio_attuale: eq,
+                log_modifiche: logs
+            });
+            
+        } catch (err) {
+            console.error("Errore rimozione:", err);
+            alert("Si è verificato un errore di rete durante la rimozione.");
+        }
+      };
+
       const attachActionListeners = () => {
+        console.log('Tasto spostamento inizializzato');
+        console.log('Tasto spostamento inizializzato: inizio hook degli action-btn');
         document.querySelectorAll('.action-btn').forEach(btn => {
           btn.addEventListener('click', (e) => {
             const idTurno = e.currentTarget.getAttribute('data-id');
@@ -310,9 +442,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(typeof openInsertModal === 'function') openInsertModal(turnoObj);
                 return;
             }
+            if(e.currentTarget.classList.contains('move')) {
+                console.log('Tasto spostamento cliccato sul turno ID:', idTurno);
+                if (!pendingMoveData) {
+                    if (typeof window.openMoveSourceModal === 'function') {
+                        window.openMoveSourceModal(turnoObj);
+                    } else {
+                        console.error('ERRORE: window.openMoveSourceModal non è una funzione!');
+                        alert('Errore di caricamento: funzione di spostamento non trovata.');
+                    }
+                } else {
+                    if (typeof window.openMoveDestModal === 'function') {
+                        window.openMoveDestModal(turnoObj);
+                    } else {
+                        console.error('ERRORE: window.openMoveDestModal non è una funzione!');
+                    }
+                }
+                return;
+            }
 
             let azione = '';
-            if(e.currentTarget.classList.contains('move')) azione = "Spostamento d'ufficio da Admin";
             if(e.currentTarget.classList.contains('delete')) azione = 'Cancellazione operatore da Admin';
             if(e.currentTarget.classList.contains('validate')) azione = 'Convalida equipaggio da Admin';
 
@@ -536,10 +685,42 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const search = modalSearch.value.toLowerCase().trim();
     
-    // Filtro "Flat" (senza guardare i ruoli per ora)
+    const selectedOption = modalRoleSelect.options[modalRoleSelect.selectedIndex];
+    const targetField = selectedOption ? selectedOption.getAttribute('data-field') : null;
+
+    const possiedeRuolo = (v, ruoloCercato) => {
+        if (!v.ruoli_areu || !Array.isArray(v.ruoli_areu)) return false;
+        return v.ruoli_areu.some(r => r.toLowerCase() === ruoloCercato.toLowerCase());
+    };
+    
+    // Filtro testuale e per ruolo
     let filtered = allVolunteersCache.filter(v => {
+      // 1. Escludi inattivi
+      if (v.attivo === false) return false;
+
+      // 2. Filtro Testuale
       const nomeCompleto = `${v.nome || ''} ${v.cognome || ''}`.toLowerCase();
-      return nomeCompleto.includes(search);
+      if (search && !nomeCompleto.includes(search)) return false;
+
+      // 3. Filtro per Ruolo
+      if (targetField === 'autista') {
+          if (!possiedeRuolo(v, 'Autista MSB')) return false;
+      } else if (targetField === 'referente_soreu') {
+          if (!possiedeRuolo(v, 'Socc. Referente per SOREU')) return false;
+      } else if (targetField === 'soccorritore') {
+          if (!possiedeRuolo(v, 'Soccorritore')) return false;
+      } else if (targetField === 'allievo_quarto_posto') {
+          if (!(possiedeRuolo(v, 'allievo/a') || possiedeRuolo(v, 'allievo') || possiedeRuolo(v, 'allieva'))) return false;
+      }
+
+      return true;
+    });
+
+    // Ordinamento alfabetico crescente (A-Z) per Cognome Nome
+    filtered.sort((a, b) => {
+      const nameA = `${a.cognome || ''} ${a.nome || ''}`.trim().toLowerCase();
+      const nameB = `${b.cognome || ''} ${b.nome || ''}`.trim().toLowerCase();
+      return nameA.localeCompare(nameB);
     });
     
     modalVolunteersList.innerHTML = '';
@@ -568,23 +749,279 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!confirm("Questo slot è già occupato. Sovrascrivere il volontario attuale?")) return;
     }
     
-    const updateData = {};
-    updateData[`equipaggio_attuale.${field}`] = {
-      matricola: user.matricola,
-      nominativo: user.nominativo || formattaNominativoUtente(user),
-      convalidato_da_admin: true
-    };
-    
     try {
       modalLoading.style.display = 'block';
-      await updateDoc(doc(db, "turni", modalTurnoId), updateData);
+      
+      await runTransaction(db, async (transaction) => {
+          const turnoRef = doc(db, "turni", modalTurnoId);
+          const turnoSnap = await transaction.get(turnoRef);
+          
+          if (!turnoSnap.exists()) {
+              throw "Il turno non esiste più.";
+          }
+          
+          const turnoData = turnoSnap.data();
+          const currentEq = turnoData.equipaggio_attuale || {};
+          
+          // Se stavamo inserendo in uno slot originariamente libero, ma ora è occupato, blocchiamo
+          if (!isOccupied && currentEq[field]?.matricola) {
+              throw "SLOT_OCCUPATO";
+          }
+          
+          const newEq = { ...currentEq };
+          newEq[field] = {
+              matricola: user.matricola,
+              nominativo: user.nominativo || formattaNominativoUtente(user),
+              convalidato_da_admin: true
+          };
+          
+          transaction.update(turnoRef, { equipaggio_attuale: newEq });
+      });
+      
       modalLoading.style.display = 'none';
       if(document.getElementById('modal-close')) document.getElementById('modal-close').click();
     } catch(e) {
       modalLoading.style.display = 'none';
-      console.error(e);
-      alert("Errore durante l'aggiornamento del turno.");
+      if (e === "SLOT_OCCUPATO") {
+          alert("Slot appena occupato da un altro utente. L'operazione è stata annullata per evitare sovrascritture accidentali.");
+      } else {
+          console.error(e);
+          alert("Errore durante l'aggiornamento del turno.");
+      }
     }
+  }
+  // --- LOGICA SPOSTAMENTO IN DUE STEP ---
+  const moveBanner = document.getElementById('move-banner');
+  const moveBannerName = document.getElementById('move-banner-name');
+  const moveBannerDate = document.getElementById('move-banner-date');
+  const btnCancelMove = document.getElementById('btn-cancel-move');
+  
+  const modalMoveSource = document.getElementById('modal-move-source');
+  const modalMoveSourceList = document.getElementById('modal-move-source-list');
+  const modalMoveSourceClose = document.getElementById('modal-move-source-close');
+  if (modalMoveSourceClose) modalMoveSourceClose.addEventListener('click', closeMoveSourceModal);
+  
+  const modalMoveDest = document.getElementById('modal-move-dest');
+  const modalMoveDestList = document.getElementById('modal-move-dest-list');
+  const modalMoveDestName = document.getElementById('modal-move-dest-name');
+  const modalMoveDestClose = document.getElementById('modal-move-dest-close');
+  if (modalMoveDestClose) modalMoveDestClose.addEventListener('click', closeMoveDestModal);
+
+  if (btnCancelMove) {
+      btnCancelMove.addEventListener('click', cancelMove);
+  }
+
+  function closeMoveSourceModal() {
+      modalMoveSource.style.display = 'none';
+  }
+
+  function closeMoveDestModal() {
+      modalMoveDest.style.display = 'none';
+  }
+
+  function cancelMove() {
+      pendingMoveData = null;
+      if(moveBanner) {
+          moveBanner.style.display = 'none';
+          moveBanner.innerHTML = `
+            <span style="font-size: 1.2rem;">🔄 Stai spostando <span id="move-banner-name" style="color: #fff; text-decoration: underline;">NOME</span> dal turno del <span id="move-banner-date" style="color: #fff;">DATA</span>.</span><br>
+            <span style="font-size: 0.95rem; opacity: 0.9;">Clicca sul tasto 'Spos.' del turno di destinazione per incollarlo, oppure</span>
+            <button id="btn-cancel-move" class="btn" style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 0.3rem 0.8rem; margin-left: 10px; font-size: 0.8rem;">Annulla Spostamento</button>
+          `;
+          // Ricollega l'evento per la prossima volta
+          document.getElementById('btn-cancel-move').addEventListener('click', cancelMove);
+      }
+  }
+
+  window.openMoveSourceModal = function(turnoObj) {
+      const eq = turnoObj.equipaggio_attuale || {};
+      const req = turnoObj.requisiti_equipaggio || {};
+      
+      const ruoliDisponibili = [];
+      if (eq.autista?.matricola) ruoliDisponibili.push({ key: 'autista', label: 'Autista', vol: eq.autista });
+      if (eq.referente_soreu?.matricola) ruoliDisponibili.push({ key: 'referente_soreu', label: 'Referente SOREU', vol: eq.referente_soreu });
+      if (eq.soccorritore?.matricola) ruoliDisponibili.push({ key: 'soccorritore', label: 'Soccorritore', vol: eq.soccorritore });
+      if (eq.allievo_quarto_posto?.matricola) ruoliDisponibili.push({ key: 'allievo_quarto_posto', label: 'Allievo (4° Posto)', vol: eq.allievo_quarto_posto });
+
+      if (!modalMoveSourceList) {
+          alert("Attenzione: il tuo browser ha in cache una vecchia versione della pagina. Premi Ctrl+F5 (o Cmd+Shift+R su Mac) per aggiornare forzatamente.");
+          return;
+      }
+
+      modalMoveSourceList.innerHTML = '';
+      
+      if (ruoliDisponibili.length === 0) {
+          modalMoveSourceList.innerHTML = '<p style="color:var(--neon-orange);">Nessun volontario prenotato in questo turno da poter spostare.</p>';
+      } else {
+          ruoliDisponibili.forEach(r => {
+              const div = document.createElement('div');
+              div.className = 'volunteer-item';
+              div.innerHTML = `
+                <div>
+                  <strong>${r.vol.nominativo || 'Sconosciuto'}</strong><br>
+                  <small style="color:var(--primary-neon);">${r.label}</small>
+                </div>
+                <button class="btn" style="border-color:var(--neon-orange); color:var(--text-main);">Prendi</button>
+              `;
+              div.onclick = () => {
+                  pendingMoveData = {
+                      sourceTurnoId: turnoObj.id,
+                      sourceTurnoDataStr: turnoObj.data + ' ' + (turnoObj.orario?.inizio || ''),
+                      sourceRoleKey: r.key,
+                      volunteer: r.vol
+                  };
+                  closeMoveSourceModal();
+                  
+                  document.getElementById('move-banner-name').textContent = r.vol.nominativo;
+                  document.getElementById('move-banner-date').textContent = turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')';
+                  moveBanner.style.display = 'block';
+              };
+              modalMoveSourceList.appendChild(div);
+          });
+      }
+      console.log('Tentativo di apertura modale (Sorgente)...');
+      const modaleEsplicita = document.getElementById('modal-move-source');
+      if (modaleEsplicita) {
+          modaleEsplicita.classList.add('active');
+          modaleEsplicita.style.display = 'flex';
+      } else {
+          console.error("ERRORE CRITICO: Elemento #modal-move-source non trovato nel DOM!");
+      }
+  };
+  window.openMoveDestModal = function(turnoObj) {
+      if (!pendingMoveData) return;
+
+      const eq = turnoObj.equipaggio_attuale || {};
+      const req = turnoObj.requisiti_equipaggio || {};
+      
+      if (!modalMoveDestList || !modalMoveDestName) {
+          alert("Attenzione: il tuo browser ha in cache una vecchia versione della pagina. Premi Ctrl+F5 (o Cmd+Shift+R su Mac) per aggiornare forzatamente.");
+          return;
+      }
+      
+      modalMoveDestName.textContent = pendingMoveData.volunteer.nominativo;
+      modalMoveDestList.innerHTML = '';
+      
+      const addDestOption = (roleKey, label, isRequired) => {
+          if (isRequired === false) return;
+          const isOccupied = !!eq[roleKey]?.matricola;
+          
+          const div = document.createElement('div');
+          div.className = 'volunteer-item';
+          div.innerHTML = `
+            <div>
+              <strong style="color:var(--primary-neon);">${label}</strong><br>
+              <small style="${isOccupied ? 'color:var(--neon-red);' : 'color:var(--neon-green);'}">${isOccupied ? 'Occupato (' + eq[roleKey].nominativo + ')' : 'Libero'}</small>
+            </div>
+            <button class="btn" style="border-color:var(--neon-green); color:var(--text-main);">Incolla qui</button>
+          `;
+          div.onclick = () => confirmMoveTransaction(turnoObj.id, roleKey, isOccupied);
+          modalMoveDestList.appendChild(div);
+      };
+
+      addDestOption('autista', 'Autista MSB', req.autista_richiesto);
+      addDestOption('referente_soreu', 'Socc. Referente per SOREU', req.referente_richiesto);
+      addDestOption('soccorritore', 'Soccorritore', req.soccorritore_richiesto);
+      addDestOption('allievo_quarto_posto', 'Allievo (4° Posto)', req.allievo_consentito !== false);
+      
+      if (modalMoveDestList.innerHTML === '') {
+          modalMoveDestList.innerHTML = '<p>Nessun ruolo disponibile per la destinazione.</p>';
+      }
+      
+      modalMoveDest.style.display = 'block';
+  };
+
+  async function confirmMoveTransaction(destTurnoId, destRoleKey, destWasOccupied) {
+      if (!pendingMoveData) return;
+      
+      if (destWasOccupied) {
+          if (!confirm("ATTENZIONE: Lo slot di destinazione è occupato. Questa operazione sovrascriverà il volontario attualmente presente. Continuare?")) {
+              return;
+          }
+      }
+      
+      if (pendingMoveData.sourceTurnoId === destTurnoId && pendingMoveData.sourceRoleKey === destRoleKey) {
+          alert("Origine e destinazione coincidono.");
+          cancelMove();
+          closeMoveDestModal();
+          return;
+      }
+
+      try {
+          closeMoveDestModal();
+          moveBanner.innerHTML = '<div style="padding: 10px;">🔄 Spostamento transazionale in corso... attendere.</div>';
+          
+          await runTransaction(db, async (transaction) => {
+              const sourceRef = doc(db, "turni", pendingMoveData.sourceTurnoId);
+              const destRef = doc(db, "turni", destTurnoId);
+              
+              const sourceSnap = await transaction.get(sourceRef);
+              if (!sourceSnap.exists()) throw "Il turno di origine non esiste più.";
+              
+              const destSnap = (pendingMoveData.sourceTurnoId === destTurnoId) ? sourceSnap : await transaction.get(destRef);
+              if (!destSnap.exists()) throw "Il turno di destinazione non esiste più.";
+              
+              const sourceData = sourceSnap.data();
+              const destData = destSnap.data();
+              
+              const sourceEq = sourceData.equipaggio_attuale || {};
+              const destEq = destData.equipaggio_attuale || {};
+              
+              if (sourceEq[pendingMoveData.sourceRoleKey]?.matricola !== pendingMoveData.volunteer.matricola) {
+                  throw "ERRORE_ORIGINE";
+              }
+              
+              if (!destWasOccupied && destEq[destRoleKey]?.matricola) {
+                  throw "SLOT_OCCUPATO";
+              }
+              
+              const newSourceEq = { ...sourceEq };
+              newSourceEq[pendingMoveData.sourceRoleKey] = { matricola: null, nominativo: null, convalidato_da_admin: false };
+              
+              const newDestEq = (pendingMoveData.sourceTurnoId === destTurnoId) ? newSourceEq : { ...destEq };
+              newDestEq[destRoleKey] = {
+                  matricola: pendingMoveData.volunteer.matricola,
+                  nominativo: pendingMoveData.volunteer.nominativo,
+                  convalidato_da_admin: true
+              };
+              
+              const sourceLogs = sourceData.log_modifiche || [];
+              sourceLogs.push({
+                  timestamp: new Date().toISOString(),
+                  autore: currentAdminUser.matricola,
+                  azione: `Spostamento in uscita verso turno ${destData.data} (${destData.orario?.inizio || ''})`,
+                  notifica_inviata: false
+              });
+              
+              const destLogs = destData.log_modifiche || [];
+              destLogs.push({
+                  timestamp: new Date().toISOString(),
+                  autore: currentAdminUser.matricola,
+                  azione: `Spostamento in ingresso dal turno ${sourceData.data} (${sourceData.orario?.inizio || ''})`,
+                  notifica_inviata: false
+              });
+
+              if (pendingMoveData.sourceTurnoId === destTurnoId) {
+                  transaction.update(sourceRef, { equipaggio_attuale: newDestEq, log_modifiche: sourceLogs });
+              } else {
+                  transaction.update(sourceRef, { equipaggio_attuale: newSourceEq, log_modifiche: sourceLogs });
+                  transaction.update(destRef, { equipaggio_attuale: newDestEq, log_modifiche: destLogs });
+              }
+          });
+          
+          cancelMove();
+          
+      } catch(e) {
+          if (e === "ERRORE_ORIGINE") {
+              alert("Errore: Il volontario che stavi cercando di spostare è stato rimosso o modificato da un altro admin nel frattempo.");
+          } else if (e === "SLOT_OCCUPATO") {
+              alert("Errore: Lo slot di destinazione è stato appena occupato da un altro admin. Operazione annullata.");
+          } else {
+              console.error(e);
+              alert("Si è verificato un errore di rete durante la transazione.");
+          }
+          cancelMove();
+      }
   }
 
 });
