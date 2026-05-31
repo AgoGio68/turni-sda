@@ -845,24 +845,39 @@ document.addEventListener('DOMContentLoaded', () => {
       return vol.nominativo || vol.nome || vol.cognome || vol.displayName || vol.matricola || null;
   }
 
-  function forceRenderModal(volontari) {
+  function forceRenderModal(volontari, turnoObj) {
       const overlay = document.createElement('div');
       overlay.id = 'modal-debug-force';
       overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white;';
       
       overlay.innerHTML = '<h1>Seleziona Volontario da spostare</h1>';
       
-      volontari.forEach(v => {
+      volontari.forEach(item => {
+          const v = item.vol;
+          const roleKey = item.roleKey;
           const btn = document.createElement('button');
           btn.innerText = v.nominativo;
-          btn.style.cssText = 'margin:10px; padding:20px; font-size:20px; cursor:pointer; color:black;';
-          btn.onclick = () => { alert('Selezionato: ' + v.nominativo); overlay.remove(); };
+          btn.style.cssText = 'margin:10px; padding:20px; font-size:20px; cursor:pointer; color:black; background:#ff9900; border:none; border-radius:8px; font-weight:bold; width:80%; max-width:400px;';
+          btn.onclick = () => { 
+              window.volontarioDaSpostare = v.nominativo;
+              window.turnoOrigineId = turnoObj.id;
+              
+              pendingMoveData = {
+                  sourceTurnoId: turnoObj.id,
+                  sourceTurnoDataStr: turnoObj.data + ' ' + (turnoObj.orario?.inizio || ''),
+                  sourceRoleKey: roleKey,
+                  volunteer: v
+              };
+              
+              overlay.remove(); 
+              createDynamicMoveBanner(v.nominativo, turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')');
+          };
           overlay.appendChild(btn);
       });
 
       const closeBtn = document.createElement('button');
       closeBtn.innerText = 'CHIUDI';
-      closeBtn.style.cssText = 'margin-top:40px; padding:15px; font-size:18px; cursor:pointer; background:red; color:white; border:none;';
+      closeBtn.style.cssText = 'margin-top:40px; padding:15px; font-size:18px; cursor:pointer; background:red; color:white; border:none; border-radius:8px;';
       closeBtn.onclick = () => overlay.remove();
       overlay.appendChild(closeBtn);
       
@@ -874,13 +889,13 @@ document.addEventListener('DOMContentLoaded', () => {
       
       const volontari = [];
       if (turnoObj && turnoObj.equipaggio_attuale) {
-          for (const vol of Object.values(turnoObj.equipaggio_attuale)) {
+          for (const [key, vol] of Object.entries(turnoObj.equipaggio_attuale)) {
               if (vol && vol.nominativo) {
-                  volontari.push(vol);
+                  volontari.push({ roleKey: key, vol: vol });
               }
           }
       }
-      forceRenderModal(volontari);
+      forceRenderModal(volontari, turnoObj);
   };
 
   window.openMoveDestModal = function(turnoObj) {
