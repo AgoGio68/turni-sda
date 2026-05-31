@@ -790,80 +790,64 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   }
-  // --- LOGICA SPOSTAMENTO IN DUE STEP ---
-  // Iniezione dinamica per eliminare dipendenze esterne HTML e prevenire 404
-  if (!document.getElementById('modal-move-source')) {
-      const modaliHtml = `
-      <div id="move-banner" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(255, 165, 0, 0.9); border: 2px solid var(--neon-orange); padding: 1rem 2rem; border-radius: 8px; z-index: 1000; box-shadow: 0 0 15px rgba(255, 165, 0, 0.5); backdrop-filter: blur(10px); color: #fff; font-weight: bold; text-align: center; max-width: 90vw;">
-        <span style="font-size: 1.2rem;">🔄 Stai spostando <span id="move-banner-name" style="color: #fff; text-decoration: underline;">NOME</span> dal turno del <span id="move-banner-date" style="color: #fff;">DATA</span>.</span><br>
-        <span style="font-size: 0.95rem; opacity: 0.9;">Clicca sul tasto 'Spos.' del turno di destinazione per incollarlo, oppure</span>
-        <button id="btn-cancel-move" class="btn" style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 0.3rem 0.8rem; margin-left: 10px; font-size: 0.8rem;">Annulla Spostamento</button>
-      </div>
-      <div id="modal-move-source" class="modal-overlay" style="display: none;">
-        <div class="glass-panel modal-content" style="max-width: 400px; width: 100%; position: relative;">
-          <button id="modal-move-source-close" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
-          <h3 style="margin-top: 0; color: var(--neon-orange);">Chi vuoi spostare?</h3>
-          <p style="color: var(--text-muted); font-size: 0.9rem;">Seleziona il volontario da spostare da questo turno:</p>
-          <div id="modal-move-source-list" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;"></div>
-        </div>
-      </div>
-      <div id="modal-move-dest" class="modal-overlay" style="display: none;">
-        <div class="glass-panel modal-content" style="max-width: 400px; width: 100%; position: relative;">
-          <button id="modal-move-dest-close" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
-          <h3 style="margin-top: 0; color: var(--neon-orange);">In quale ruolo vuoi incollarlo?</h3>
-          <p style="color: var(--text-muted); font-size: 0.9rem;">Scegli lo slot di destinazione per <strong id="modal-move-dest-name">NOME</strong>:</p>
-          <div id="modal-move-dest-list" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;"></div>
-        </div>
-      </div>
-      `;
-      document.body.insertAdjacentHTML('beforeend', modaliHtml);
-  }
-
-  const moveBanner = document.getElementById('move-banner');
-  const moveBannerName = document.getElementById('move-banner-name');
-  const moveBannerDate = document.getElementById('move-banner-date');
-  const btnCancelMove = document.getElementById('btn-cancel-move');
-  
-  const modalMoveSource = document.getElementById('modal-move-source');
-  let modalMoveSourceList = document.getElementById('modal-move-source-list'); // cambiato a let per sicurezza in ri-assegnazioni
-  const modalMoveSourceClose = document.getElementById('modal-move-source-close');
-  if (modalMoveSourceClose) modalMoveSourceClose.addEventListener('click', closeMoveSourceModal);
-  
-  const modalMoveDest = document.getElementById('modal-move-dest');
-  let modalMoveDestList = document.getElementById('modal-move-dest-list'); // cambiato a let
-  const modalMoveDestName = document.getElementById('modal-move-dest-name');
-  const modalMoveDestClose = document.getElementById('modal-move-dest-close');
-  if (modalMoveDestClose) modalMoveDestClose.addEventListener('click', closeMoveDestModal);
-
-  if (btnCancelMove) {
-      btnCancelMove.addEventListener('click', cancelMove);
-  }
+  // --- LOGICA SPOSTAMENTO IN DUE STEP (COMPLETAMENTE DINAMICA) ---
 
   function closeMoveSourceModal() {
-      modalMoveSource.style.display = 'none';
+      const modal = document.getElementById('dynamic-modal-move-source');
+      if (modal) modal.remove();
   }
 
   function closeMoveDestModal() {
-      modalMoveDest.style.display = 'none';
+      const modal = document.getElementById('dynamic-modal-move-dest');
+      if (modal) modal.remove();
   }
 
   function cancelMove() {
       pendingMoveData = null;
-      if(moveBanner) {
-          moveBanner.style.display = 'none';
-          moveBanner.innerHTML = `
-            <span style="font-size: 1.2rem;">🔄 Stai spostando <span id="move-banner-name" style="color: #fff; text-decoration: underline;">NOME</span> dal turno del <span id="move-banner-date" style="color: #fff;">DATA</span>.</span><br>
-            <span style="font-size: 0.95rem; opacity: 0.9;">Clicca sul tasto 'Spos.' del turno di destinazione per incollarlo, oppure</span>
-            <button id="btn-cancel-move" class="btn" style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 0.3rem 0.8rem; margin-left: 10px; font-size: 0.8rem;">Annulla Spostamento</button>
-          `;
-          // Ricollega l'evento per la prossima volta
-          document.getElementById('btn-cancel-move').addEventListener('click', cancelMove);
-      }
+      const banner = document.getElementById('dynamic-move-banner');
+      if (banner) banner.remove();
+  }
+
+  function createDynamicMoveBanner(name, dateStr) {
+      cancelMove(); // Assicura che non ci siano banner precedenti
+      
+      const banner = document.createElement('div');
+      banner.id = 'dynamic-move-banner';
+      banner.style.position = 'fixed';
+      banner.style.bottom = '20px';
+      banner.style.left = '50%';
+      banner.style.transform = 'translateX(-50%)';
+      banner.style.background = 'rgba(255, 165, 0, 0.9)';
+      banner.style.border = '2px solid var(--neon-orange, #ff9900)';
+      banner.style.padding = '1rem 2rem';
+      banner.style.borderRadius = '8px';
+      banner.style.zIndex = '1000';
+      banner.style.boxShadow = '0 0 15px rgba(255, 165, 0, 0.5)';
+      banner.style.backdropFilter = 'blur(10px)';
+      banner.style.color = '#fff';
+      banner.style.fontWeight = 'bold';
+      banner.style.textAlign = 'center';
+      banner.style.maxWidth = '90vw';
+      
+      banner.innerHTML = `
+        <span style="font-size: 1.2rem;">🔄 Stai spostando <span style="color: #fff; text-decoration: underline;">${name}</span> dal turno del <span style="color: #fff;">${dateStr}</span>.</span><br>
+        <span style="font-size: 0.95rem; opacity: 0.9;">Clicca sul tasto 'Spos.' del turno di destinazione per incollarlo, oppure</span>
+        <button id="dynamic-btn-cancel-move" class="btn" style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 0.3rem 0.8rem; margin-left: 10px; font-size: 0.8rem;">Annulla Spostamento</button>
+      `;
+      
+      document.body.appendChild(banner);
+      document.getElementById('dynamic-btn-cancel-move').addEventListener('click', cancelMove);
   }
 
   window.openMoveSourceModal = function(turnoObj) {
+      console.log('Tentativo di apertura modale (Sorgente dinamica)...');
+      console.log('Dati turno recuperati:', turnoObj);
+      console.log('ID Turno:', turnoObj.id);
+      
+      closeMoveSourceModal(); 
+      closeMoveDestModal();
+      
       const eq = turnoObj.equipaggio_attuale || {};
-      const req = turnoObj.requisiti_equipaggio || {};
       
       const ruoliDisponibili = [];
       if (eq.autista?.matricola) ruoliDisponibili.push({ key: 'autista', label: 'Autista', vol: eq.autista });
@@ -871,27 +855,78 @@ document.addEventListener('DOMContentLoaded', () => {
       if (eq.soccorritore?.matricola) ruoliDisponibili.push({ key: 'soccorritore', label: 'Soccorritore', vol: eq.soccorritore });
       if (eq.allievo_quarto_posto?.matricola) ruoliDisponibili.push({ key: 'allievo_quarto_posto', label: 'Allievo (4° Posto)', vol: eq.allievo_quarto_posto });
 
-      if (!modalMoveSourceList) {
-          alert("Attenzione: il tuo browser ha in cache una vecchia versione della pagina. Premi Ctrl+F5 (o Cmd+Shift+R su Mac) per aggiornare forzatamente.");
-          return;
-      }
+      const overlay = document.createElement('div');
+      overlay.id = 'dynamic-modal-move-source';
+      overlay.style.position = 'fixed';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.width = '100%';
+      overlay.style.height = '100%';
+      overlay.style.background = 'rgba(0,0,0,0.8)';
+      overlay.style.zIndex = '9999';
+      overlay.style.display = 'flex';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
 
-      modalMoveSourceList.innerHTML = '';
-      
+      const content = document.createElement('div');
+      content.className = 'glass-panel modal-content';
+      content.style.maxWidth = '400px';
+      content.style.width = '100%';
+      content.style.position = 'relative';
+
+      const closeBtn = document.createElement('button');
+      closeBtn.innerHTML = '&times;';
+      closeBtn.style.position = 'absolute';
+      closeBtn.style.top = '1rem';
+      closeBtn.style.right = '1rem';
+      closeBtn.style.background = 'transparent';
+      closeBtn.style.border = 'none';
+      closeBtn.style.color = 'var(--text-muted, #94a3b8)';
+      closeBtn.style.fontSize = '1.5rem';
+      closeBtn.style.cursor = 'pointer';
+      closeBtn.onclick = closeMoveSourceModal;
+
+      const title = document.createElement('h3');
+      title.textContent = 'Chi vuoi spostare?';
+      title.style.marginTop = '0';
+      title.style.color = 'var(--neon-orange, #ff9900)';
+
+      const desc = document.createElement('p');
+      desc.textContent = 'Seleziona il volontario da spostare da questo turno:';
+      desc.style.color = 'var(--text-muted, #94a3b8)';
+      desc.style.fontSize = '0.9rem';
+
+      const listDiv = document.createElement('div');
+      listDiv.style.maxHeight = '300px';
+      listDiv.style.overflowY = 'auto';
+      listDiv.style.display = 'flex';
+      listDiv.style.flexDirection = 'column';
+      listDiv.style.gap = '0.5rem';
+
       if (ruoliDisponibili.length === 0) {
-          modalMoveSourceList.innerHTML = '<p style="color:var(--neon-orange);">Nessun volontario prenotato in questo turno da poter spostare.</p>';
+          listDiv.innerHTML = '<p style="color:var(--neon-orange, #ff9900);">Nessun volontario prenotato in questo turno da poter spostare.</p>';
       } else {
           ruoliDisponibili.forEach(r => {
-              const div = document.createElement('div');
-              div.className = 'volunteer-item';
-              div.innerHTML = `
+              const item = document.createElement('div');
+              item.className = 'volunteer-item';
+              item.style.padding = '0.8rem';
+              item.style.background = 'rgba(255,255,255,0.05)';
+              item.style.border = '1px solid var(--border-glass, rgba(255,255,255,0.1))';
+              item.style.borderRadius = '8px';
+              item.style.cursor = 'pointer';
+              item.style.display = 'flex';
+              item.style.justifyContent = 'space-between';
+              item.style.alignItems = 'center';
+
+              item.innerHTML = `
                 <div>
                   <strong>${r.vol.nominativo || 'Sconosciuto'}</strong><br>
-                  <small style="color:var(--primary-neon);">${r.label}</small>
+                  <small style="color:var(--primary-neon, #3b82f6);">${r.label}</small>
                 </div>
-                <button class="btn" style="border-color:var(--neon-orange); color:var(--text-main);">Prendi</button>
+                <button class="btn" style="border-color:var(--neon-orange, #ff9900); color:var(--text-main, #f1f5f9);">Prendi</button>
               `;
-              div.onclick = () => {
+              
+              item.onclick = () => {
                   pendingMoveData = {
                       sourceTurnoId: turnoObj.id,
                       sourceTurnoDataStr: turnoObj.data + ' ' + (turnoObj.orario?.inizio || ''),
@@ -899,52 +934,101 @@ document.addEventListener('DOMContentLoaded', () => {
                       volunteer: r.vol
                   };
                   closeMoveSourceModal();
-                  
-                  document.getElementById('move-banner-name').textContent = r.vol.nominativo;
-                  document.getElementById('move-banner-date').textContent = turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')';
-                  moveBanner.style.display = 'block';
+                  createDynamicMoveBanner(r.vol.nominativo, turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')');
               };
-              modalMoveSourceList.appendChild(div);
+              listDiv.appendChild(item);
           });
       }
-      console.log('Tentativo di apertura modale (Sorgente)...');
-      const modaleEsplicita = document.getElementById('modal-move-source');
-      if (modaleEsplicita) {
-          modaleEsplicita.classList.add('active');
-          modaleEsplicita.style.display = 'flex';
-      } else {
-          console.error("ERRORE CRITICO: Elemento #modal-move-source non trovato nel DOM!");
-      }
+
+      content.appendChild(closeBtn);
+      content.appendChild(title);
+      content.appendChild(desc);
+      content.appendChild(listDiv);
+      overlay.appendChild(content);
+      
+      document.body.appendChild(overlay);
   };
+
   window.openMoveDestModal = function(turnoObj) {
       if (!pendingMoveData) return;
-
+      
+      closeMoveDestModal();
+      
       const eq = turnoObj.equipaggio_attuale || {};
       const req = turnoObj.requisiti_equipaggio || {};
-      
-      if (!modalMoveDestList || !modalMoveDestName) {
-          alert("Attenzione: il tuo browser ha in cache una vecchia versione della pagina. Premi Ctrl+F5 (o Cmd+Shift+R su Mac) per aggiornare forzatamente.");
-          return;
-      }
-      
-      modalMoveDestName.textContent = pendingMoveData.volunteer.nominativo;
-      modalMoveDestList.innerHTML = '';
-      
+
+      const overlay = document.createElement('div');
+      overlay.id = 'dynamic-modal-move-dest';
+      overlay.style.position = 'fixed';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.width = '100%';
+      overlay.style.height = '100%';
+      overlay.style.background = 'rgba(0,0,0,0.8)';
+      overlay.style.zIndex = '9999';
+      overlay.style.display = 'flex';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+
+      const content = document.createElement('div');
+      content.className = 'glass-panel modal-content';
+      content.style.maxWidth = '400px';
+      content.style.width = '100%';
+      content.style.position = 'relative';
+
+      const closeBtn = document.createElement('button');
+      closeBtn.innerHTML = '&times;';
+      closeBtn.style.position = 'absolute';
+      closeBtn.style.top = '1rem';
+      closeBtn.style.right = '1rem';
+      closeBtn.style.background = 'transparent';
+      closeBtn.style.border = 'none';
+      closeBtn.style.color = 'var(--text-muted, #94a3b8)';
+      closeBtn.style.fontSize = '1.5rem';
+      closeBtn.style.cursor = 'pointer';
+      closeBtn.onclick = closeMoveDestModal;
+
+      const title = document.createElement('h3');
+      title.textContent = 'In quale ruolo vuoi incollarlo?';
+      title.style.marginTop = '0';
+      title.style.color = 'var(--neon-orange, #ff9900)';
+
+      const desc = document.createElement('p');
+      desc.innerHTML = `Scegli lo slot di destinazione per <strong style="color:var(--text-main, #f1f5f9);">${pendingMoveData.volunteer.nominativo}</strong>:`;
+      desc.style.color = 'var(--text-muted, #94a3b8)';
+      desc.style.fontSize = '0.9rem';
+
+      const listDiv = document.createElement('div');
+      listDiv.style.maxHeight = '300px';
+      listDiv.style.overflowY = 'auto';
+      listDiv.style.display = 'flex';
+      listDiv.style.flexDirection = 'column';
+      listDiv.style.gap = '0.5rem';
+
       const addDestOption = (roleKey, label, isRequired) => {
           if (isRequired === false) return;
           const isOccupied = !!eq[roleKey]?.matricola;
           
-          const div = document.createElement('div');
-          div.className = 'volunteer-item';
-          div.innerHTML = `
+          const item = document.createElement('div');
+          item.className = 'volunteer-item';
+          item.style.padding = '0.8rem';
+          item.style.background = 'rgba(255,255,255,0.05)';
+          item.style.border = '1px solid var(--border-glass, rgba(255,255,255,0.1))';
+          item.style.borderRadius = '8px';
+          item.style.cursor = 'pointer';
+          item.style.display = 'flex';
+          item.style.justifyContent = 'space-between';
+          item.style.alignItems = 'center';
+
+          item.innerHTML = `
             <div>
-              <strong style="color:var(--primary-neon);">${label}</strong><br>
-              <small style="${isOccupied ? 'color:var(--neon-red);' : 'color:var(--neon-green);'}">${isOccupied ? 'Occupato (' + eq[roleKey].nominativo + ')' : 'Libero'}</small>
+              <strong style="color:var(--primary-neon, #3b82f6);">${label}</strong><br>
+              <small style="${isOccupied ? 'color:var(--neon-red, #ff073a);' : 'color:var(--neon-green, #39ff14);'}">${isOccupied ? 'Occupato (' + eq[roleKey].nominativo + ')' : 'Libero'}</small>
             </div>
-            <button class="btn" style="border-color:var(--neon-green); color:var(--text-main);">Incolla qui</button>
+            <button class="btn" style="border-color:var(--neon-green, #39ff14); color:var(--text-main, #f1f5f9);">Incolla qui</button>
           `;
-          div.onclick = () => confirmMoveTransaction(turnoObj.id, roleKey, isOccupied);
-          modalMoveDestList.appendChild(div);
+          item.onclick = () => confirmMoveTransaction(turnoObj.id, roleKey, isOccupied);
+          listDiv.appendChild(item);
       };
 
       addDestOption('autista', 'Autista MSB', req.autista_richiesto);
@@ -952,11 +1036,17 @@ document.addEventListener('DOMContentLoaded', () => {
       addDestOption('soccorritore', 'Soccorritore', req.soccorritore_richiesto);
       addDestOption('allievo_quarto_posto', 'Allievo (4° Posto)', req.allievo_consentito !== false);
       
-      if (modalMoveDestList.innerHTML === '') {
-          modalMoveDestList.innerHTML = '<p>Nessun ruolo disponibile per la destinazione.</p>';
+      if (listDiv.children.length === 0) {
+          listDiv.innerHTML = '<p style="color:var(--text-muted);">Nessun ruolo disponibile per la destinazione.</p>';
       }
+
+      content.appendChild(closeBtn);
+      content.appendChild(title);
+      content.appendChild(desc);
+      content.appendChild(listDiv);
+      overlay.appendChild(content);
       
-      modalMoveDest.style.display = 'block';
+      document.body.appendChild(overlay);
   };
 
   async function confirmMoveTransaction(destTurnoId, destRoleKey, destWasOccupied) {
@@ -977,7 +1067,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
           closeMoveDestModal();
-          moveBanner.innerHTML = '<div style="padding: 10px;">🔄 Spostamento transazionale in corso... attendere.</div>';
+          const banner = document.getElementById('dynamic-move-banner');
+          if (banner) banner.innerHTML = '<div style="padding: 10px;">🔄 Spostamento transazionale in corso... attendere.</div>';
           
           await runTransaction(db, async (transaction) => {
               const sourceRef = doc(db, "turni", pendingMoveData.sourceTurnoId);
