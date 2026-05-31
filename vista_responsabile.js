@@ -845,153 +845,42 @@ document.addEventListener('DOMContentLoaded', () => {
       return vol.nominativo || vol.nome || vol.cognome || vol.displayName || vol.matricola || null;
   }
 
-  window.openMoveSourceModal = function(turnoObj) {
-      console.log('Tentativo di apertura modale (Sorgente dinamica)...');
-      console.log('Dati turno recuperati:', turnoObj);
-      console.log('ID Turno:', turnoObj.id);
-      
-      closeMoveSourceModal(); 
-      closeMoveDestModal();
-      
-      const eq = turnoObj.equipaggio_attuale || {};
-      console.log('Valore volontario per autista:', eq.autista);
-      
+  function forceRenderModal(volontari) {
       const overlay = document.createElement('div');
-      overlay.id = 'dynamic-modal-move-source';
-      overlay.style.position = 'fixed';
-      overlay.style.top = '0';
-      overlay.style.left = '0';
-      overlay.style.width = '100%';
-      overlay.style.height = '100%';
-      overlay.style.background = 'rgba(0,0,0,0.8)';
-      overlay.style.zIndex = '9999';
-      overlay.style.display = 'flex';
-      overlay.style.alignItems = 'center';
-      overlay.style.justifyContent = 'center';
-
-      const content = document.createElement('div');
-      content.className = 'glass-panel modal-content';
-      content.style.maxWidth = '400px';
-      content.style.width = '100%';
-      content.style.position = 'relative';
+      overlay.id = 'modal-debug-force';
+      overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:99999; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white;';
+      
+      overlay.innerHTML = '<h1>Seleziona Volontario da spostare</h1>';
+      
+      volontari.forEach(v => {
+          const btn = document.createElement('button');
+          btn.innerText = v.nominativo;
+          btn.style.cssText = 'margin:10px; padding:20px; font-size:20px; cursor:pointer; color:black;';
+          btn.onclick = () => { alert('Selezionato: ' + v.nominativo); overlay.remove(); };
+          overlay.appendChild(btn);
+      });
 
       const closeBtn = document.createElement('button');
-      closeBtn.innerHTML = '&times;';
-      closeBtn.style.position = 'absolute';
-      closeBtn.style.top = '1rem';
-      closeBtn.style.right = '1rem';
-      closeBtn.style.background = 'transparent';
-      closeBtn.style.border = 'none';
-      closeBtn.style.color = 'var(--text-muted, #94a3b8)';
-      closeBtn.style.fontSize = '1.5rem';
-      closeBtn.style.cursor = 'pointer';
-      closeBtn.onclick = closeMoveSourceModal;
-
-      const title = document.createElement('h3');
-      title.textContent = 'Chi vuoi spostare?';
-      title.style.marginTop = '0';
-      title.style.color = 'var(--neon-orange, #ff9900)';
-
-      const desc = document.createElement('p');
-      desc.textContent = 'Seleziona il volontario da spostare da questo turno:';
-      desc.style.color = 'var(--text-muted, #94a3b8)';
-      desc.style.fontSize = '0.9rem';
-
-      const listDiv = document.createElement('div');
-      listDiv.id = 'contenitore-lista-modale';
-      listDiv.style.maxHeight = '300px';
-      listDiv.style.overflowY = 'auto';
-      listDiv.style.display = 'flex';
-      listDiv.style.flexDirection = 'column';
-      listDiv.style.gap = '0.5rem';
-
-      content.appendChild(closeBtn);
-      content.appendChild(title);
-      content.appendChild(desc);
-      content.appendChild(listDiv);
-      overlay.appendChild(content);
+      closeBtn.innerText = 'CHIUDI';
+      closeBtn.style.cssText = 'margin-top:40px; padding:15px; font-size:18px; cursor:pointer; background:red; color:white; border:none;';
+      closeBtn.onclick = () => overlay.remove();
+      overlay.appendChild(closeBtn);
       
       document.body.appendChild(overlay);
+  }
 
-      // Ora che il contenitore è nel DOM, eseguiamo la logica richiesta
-      const contenitore = document.getElementById('contenitore-lista-modale');
-      contenitore.innerHTML = ''; // Pulizia come richiesto
+  window.openMoveSourceModal = function(turnoObj) {
+      console.log('Tentativo di apertura modale (Sorgente dinamica)...');
       
-      let numeroBottoni = 0;
-
-      if (turnoObj.equipaggio_attuale) {
-          for (const [key, vol] of Object.entries(turnoObj.equipaggio_attuale)) {
-              const item = document.createElement('div');
-              item.className = 'volunteer-item';
-              item.style.padding = '0.8rem';
-              item.style.background = 'rgba(255,255,255,0.05)';
-              item.style.border = '1px solid var(--border-glass, rgba(255,255,255,0.1))';
-              item.style.borderRadius = '8px';
-              item.style.display = 'flex';
-              item.style.justifyContent = 'space-between';
-              item.style.alignItems = 'center';
-
-              let nomeDaVisualizzare = 'Posto Libero';
+      const volontari = [];
+      if (turnoObj && turnoObj.equipaggio_attuale) {
+          for (const vol of Object.values(turnoObj.equipaggio_attuale)) {
               if (vol && vol.nominativo) {
-                  nomeDaVisualizzare = vol.nominativo;
+                  volontari.push(vol);
               }
-
-              // Creiamo un wrapper per il testo
-              const infoDiv = document.createElement('div');
-              const labelRuoloMap = {
-                  'autista': 'Autista MSB',
-                  'referente_soreu': 'Socc. Referente per SOREU',
-                  'soccorritore': 'Soccorritore',
-                  'allievo_quarto_posto': 'Allievo (4° Posto)'
-              };
-              const labelClean = labelRuoloMap[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '));
-              
-              if (vol && vol.nominativo) {
-                  infoDiv.innerHTML = `<strong>${nomeDaVisualizzare}</strong><br><small style="color:var(--primary-neon, #3b82f6);">${labelClean}</small>`;
-                  item.appendChild(infoDiv);
-                  
-                  const btn = document.createElement('button');
-                  btn.className = 'btn';
-                  btn.textContent = 'Seleziona questo volontario';
-                  btn.style.borderColor = 'var(--neon-orange, #ff9900)';
-                  btn.style.color = 'var(--text-main, #f1f5f9)';
-                  btn.style.cursor = 'pointer';
-                  
-                  // Aggiunta Event Listener esplicito come richiesto
-                  btn.addEventListener('click', () => {
-                      if (typeof window.selezionaVolontarioPerSpostamento === 'function') {
-                          window.selezionaVolontarioPerSpostamento(vol.nominativo);
-                      }
-                      
-                      window.volontarioDaSpostare = vol;
-                      pendingMoveData = {
-                          sourceTurnoId: turnoObj.id,
-                          sourceTurnoDataStr: turnoObj.data + ' ' + (turnoObj.orario?.inizio || ''),
-                          sourceRoleKey: key,
-                          volunteer: { ...(vol || {}), nominativo: nomeDaVisualizzare }
-                      };
-                      closeMoveSourceModal();
-                      createDynamicMoveBanner(nomeDaVisualizzare, turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')');
-                  });
-                  
-                  item.appendChild(btn);
-                  numeroBottoni++;
-              } else {
-                  // Posto Libero (senza bottone)
-                  item.style.opacity = '0.6';
-                  infoDiv.innerHTML = `<strong style="color:var(--text-muted, #94a3b8);">${nomeDaVisualizzare}</strong><br><small style="color:var(--primary-neon, #3b82f6);">${labelClean}</small>`;
-                  item.appendChild(infoDiv);
-              }
-              
-              contenitore.appendChild(item);
           }
       }
-
-      console.log('Bottoni creati:', numeroBottoni);
-      
-      if (numeroBottoni === 0) {
-          contenitore.innerHTML += '<p style="color:var(--neon-orange, #ff9900); padding: 10px;">Nessun volontario spostabile in questo turno.</p>';
-      }
+      forceRenderModal(volontari);
   };
 
   window.openMoveDestModal = function(turnoObj) {
