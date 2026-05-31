@@ -856,33 +856,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const eq = turnoObj.equipaggio_attuale || {};
       console.log('Valore volontario per autista:', eq.autista);
       
-      const ruoliDisponibili = [];
-      const labelMap = {
-          'autista': 'Autista MSB',
-          'referente_soreu': 'Socc. Referente per SOREU',
-          'soccorritore': 'Soccorritore',
-          'allievo_quarto_posto': 'Allievo (4° Posto)'
-      };
-
-      if (turnoObj.equipaggio_attuale) {
-          for (const [key, vol] of Object.entries(turnoObj.equipaggio_attuale)) {
-              let nomeDaVisualizzare = 'Posto Libero';
-              let isOccupied = false;
-              if (vol && vol.nominativo) {
-                  nomeDaVisualizzare = vol.nominativo;
-                  isOccupied = true;
-              }
-              
-              ruoliDisponibili.push({ 
-                  key: key, 
-                  label: labelMap[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')), 
-                  vol: vol,
-                  dispName: nomeDaVisualizzare,
-                  isOccupied: isOccupied
-              });
-          }
-      }
-
       const overlay = document.createElement('div');
       overlay.id = 'dynamic-modal-move-source';
       overlay.style.position = 'fixed';
@@ -925,16 +898,29 @@ document.addEventListener('DOMContentLoaded', () => {
       desc.style.fontSize = '0.9rem';
 
       const listDiv = document.createElement('div');
+      listDiv.id = 'contenitore-lista-modale';
       listDiv.style.maxHeight = '300px';
       listDiv.style.overflowY = 'auto';
       listDiv.style.display = 'flex';
       listDiv.style.flexDirection = 'column';
       listDiv.style.gap = '0.5rem';
 
-      if (ruoliDisponibili.length === 0) {
-          listDiv.innerHTML = '<p style="color:var(--neon-orange, #ff9900);">Nessun volontario prenotato in questo turno da poter spostare.</p>';
-      } else {
-          ruoliDisponibili.forEach(r => {
+      content.appendChild(closeBtn);
+      content.appendChild(title);
+      content.appendChild(desc);
+      content.appendChild(listDiv);
+      overlay.appendChild(content);
+      
+      document.body.appendChild(overlay);
+
+      // Ora che il contenitore è nel DOM, eseguiamo la logica richiesta
+      const contenitore = document.getElementById('contenitore-lista-modale');
+      contenitore.innerHTML = ''; // Pulizia come richiesto
+      
+      let numeroBottoni = 0;
+
+      if (turnoObj.equipaggio_attuale) {
+          for (const [key, vol] of Object.entries(turnoObj.equipaggio_attuale)) {
               const item = document.createElement('div');
               item.className = 'volunteer-item';
               item.style.padding = '0.8rem';
@@ -945,47 +931,67 @@ document.addEventListener('DOMContentLoaded', () => {
               item.style.justifyContent = 'space-between';
               item.style.alignItems = 'center';
 
-              if (r.isOccupied) {
-                  item.style.cursor = 'pointer';
-                  item.innerHTML = `
-                    <div>
-                      <strong>${r.dispName}</strong><br>
-                      <small style="color:var(--primary-neon, #3b82f6);">${r.label}</small>
-                    </div>
-                    <button class="btn" style="border-color:var(--neon-orange, #ff9900); color:var(--text-main, #f1f5f9);">Seleziona questo volontario</button>
-                  `;
+              let nomeDaVisualizzare = 'Posto Libero';
+              if (vol && vol.nominativo) {
+                  nomeDaVisualizzare = vol.nominativo;
+              }
+
+              // Creiamo un wrapper per il testo
+              const infoDiv = document.createElement('div');
+              const labelRuoloMap = {
+                  'autista': 'Autista MSB',
+                  'referente_soreu': 'Socc. Referente per SOREU',
+                  'soccorritore': 'Soccorritore',
+                  'allievo_quarto_posto': 'Allievo (4° Posto)'
+              };
+              const labelClean = labelRuoloMap[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '));
+              
+              if (vol && vol.nominativo) {
+                  infoDiv.innerHTML = `<strong>${nomeDaVisualizzare}</strong><br><small style="color:var(--primary-neon, #3b82f6);">${labelClean}</small>`;
+                  item.appendChild(infoDiv);
                   
-                  item.onclick = () => {
-                      window.volontarioDaSpostare = r.vol; // Esposto globalmente come richiesto
+                  const btn = document.createElement('button');
+                  btn.className = 'btn';
+                  btn.textContent = 'Seleziona questo volontario';
+                  btn.style.borderColor = 'var(--neon-orange, #ff9900)';
+                  btn.style.color = 'var(--text-main, #f1f5f9)';
+                  btn.style.cursor = 'pointer';
+                  
+                  // Aggiunta Event Listener esplicito come richiesto
+                  btn.addEventListener('click', () => {
+                      if (typeof window.selezionaVolontarioPerSpostamento === 'function') {
+                          window.selezionaVolontarioPerSpostamento(vol.nominativo);
+                      }
+                      
+                      window.volontarioDaSpostare = vol;
                       pendingMoveData = {
                           sourceTurnoId: turnoObj.id,
                           sourceTurnoDataStr: turnoObj.data + ' ' + (turnoObj.orario?.inizio || ''),
-                          sourceRoleKey: r.key,
-                          volunteer: { ...(r.vol || {}), nominativo: r.dispName }
+                          sourceRoleKey: key,
+                          volunteer: { ...(vol || {}), nominativo: nomeDaVisualizzare }
                       };
                       closeMoveSourceModal();
-                      createDynamicMoveBanner(r.dispName, turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')');
-                  };
+                      createDynamicMoveBanner(nomeDaVisualizzare, turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')');
+                  });
+                  
+                  item.appendChild(btn);
+                  numeroBottoni++;
               } else {
+                  // Posto Libero (senza bottone)
                   item.style.opacity = '0.6';
-                  item.innerHTML = `
-                    <div>
-                      <strong style="color:var(--text-muted, #94a3b8);">${r.dispName}</strong><br>
-                      <small style="color:var(--primary-neon, #3b82f6);">${r.label}</small>
-                    </div>
-                  `;
+                  infoDiv.innerHTML = `<strong style="color:var(--text-muted, #94a3b8);">${nomeDaVisualizzare}</strong><br><small style="color:var(--primary-neon, #3b82f6);">${labelClean}</small>`;
+                  item.appendChild(infoDiv);
               }
-              listDiv.appendChild(item);
-          });
+              
+              contenitore.appendChild(item);
+          }
       }
 
-      content.appendChild(closeBtn);
-      content.appendChild(title);
-      content.appendChild(desc);
-      content.appendChild(listDiv);
-      overlay.appendChild(content);
+      console.log('Bottoni creati:', numeroBottoni);
       
-      document.body.appendChild(overlay);
+      if (numeroBottoni === 0) {
+          contenitore.innerHTML += '<p style="color:var(--neon-orange, #ff9900); padding: 10px;">Nessun volontario spostabile in questo turno.</p>';
+      }
   };
 
   window.openMoveDestModal = function(turnoObj) {
