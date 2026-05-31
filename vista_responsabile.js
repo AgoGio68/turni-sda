@@ -791,18 +791,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
   // --- LOGICA SPOSTAMENTO IN DUE STEP ---
+  // Iniezione dinamica per eliminare dipendenze esterne HTML e prevenire 404
+  if (!document.getElementById('modal-move-source')) {
+      const modaliHtml = `
+      <div id="move-banner" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(255, 165, 0, 0.9); border: 2px solid var(--neon-orange); padding: 1rem 2rem; border-radius: 8px; z-index: 1000; box-shadow: 0 0 15px rgba(255, 165, 0, 0.5); backdrop-filter: blur(10px); color: #fff; font-weight: bold; text-align: center; max-width: 90vw;">
+        <span style="font-size: 1.2rem;">🔄 Stai spostando <span id="move-banner-name" style="color: #fff; text-decoration: underline;">NOME</span> dal turno del <span id="move-banner-date" style="color: #fff;">DATA</span>.</span><br>
+        <span style="font-size: 0.95rem; opacity: 0.9;">Clicca sul tasto 'Spos.' del turno di destinazione per incollarlo, oppure</span>
+        <button id="btn-cancel-move" class="btn" style="background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 0.3rem 0.8rem; margin-left: 10px; font-size: 0.8rem;">Annulla Spostamento</button>
+      </div>
+      <div id="modal-move-source" class="modal-overlay" style="display: none;">
+        <div class="glass-panel modal-content" style="max-width: 400px; width: 100%; position: relative;">
+          <button id="modal-move-source-close" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
+          <h3 style="margin-top: 0; color: var(--neon-orange);">Chi vuoi spostare?</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem;">Seleziona il volontario da spostare da questo turno:</p>
+          <div id="modal-move-source-list" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+        </div>
+      </div>
+      <div id="modal-move-dest" class="modal-overlay" style="display: none;">
+        <div class="glass-panel modal-content" style="max-width: 400px; width: 100%; position: relative;">
+          <button id="modal-move-dest-close" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">&times;</button>
+          <h3 style="margin-top: 0; color: var(--neon-orange);">In quale ruolo vuoi incollarlo?</h3>
+          <p style="color: var(--text-muted); font-size: 0.9rem;">Scegli lo slot di destinazione per <strong id="modal-move-dest-name">NOME</strong>:</p>
+          <div id="modal-move-dest-list" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+        </div>
+      </div>
+      `;
+      document.body.insertAdjacentHTML('beforeend', modaliHtml);
+  }
+
   const moveBanner = document.getElementById('move-banner');
   const moveBannerName = document.getElementById('move-banner-name');
   const moveBannerDate = document.getElementById('move-banner-date');
   const btnCancelMove = document.getElementById('btn-cancel-move');
   
   const modalMoveSource = document.getElementById('modal-move-source');
-  const modalMoveSourceList = document.getElementById('modal-move-source-list');
+  let modalMoveSourceList = document.getElementById('modal-move-source-list'); // cambiato a let per sicurezza in ri-assegnazioni
   const modalMoveSourceClose = document.getElementById('modal-move-source-close');
   if (modalMoveSourceClose) modalMoveSourceClose.addEventListener('click', closeMoveSourceModal);
   
   const modalMoveDest = document.getElementById('modal-move-dest');
-  const modalMoveDestList = document.getElementById('modal-move-dest-list');
+  let modalMoveDestList = document.getElementById('modal-move-dest-list'); // cambiato a let
   const modalMoveDestName = document.getElementById('modal-move-dest-name');
   const modalMoveDestClose = document.getElementById('modal-move-dest-close');
   if (modalMoveDestClose) modalMoveDestClose.addEventListener('click', closeMoveDestModal);
