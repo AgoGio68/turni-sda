@@ -839,6 +839,12 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('dynamic-btn-cancel-move').addEventListener('click', cancelMove);
   }
 
+  function getVolName(vol) {
+      if (!vol) return null;
+      if (typeof vol === 'string') return vol;
+      return vol.nominativo || vol.nome || vol.cognome || vol.displayName || vol.matricola || null;
+  }
+
   window.openMoveSourceModal = function(turnoObj) {
       console.log('Tentativo di apertura modale (Sorgente dinamica)...');
       console.log('Dati turno recuperati:', turnoObj);
@@ -848,6 +854,7 @@ document.addEventListener('DOMContentLoaded', () => {
       closeMoveDestModal();
       
       const eq = turnoObj.equipaggio_attuale || {};
+      console.log('Valore volontario per autista:', eq.autista);
       
       const ruoliDisponibili = [];
       const labelMap = {
@@ -859,13 +866,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (turnoObj.equipaggio_attuale) {
           for (const [key, vol] of Object.entries(turnoObj.equipaggio_attuale)) {
-              if (vol && (vol.matricola || vol.nominativo)) {
-                  ruoliDisponibili.push({ 
-                      key: key, 
-                      label: labelMap[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')), 
-                      vol: vol 
-                  });
-              }
+              let dispName = getVolName(vol);
+              ruoliDisponibili.push({ 
+                  key: key, 
+                  label: labelMap[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')), 
+                  vol: vol,
+                  dispName: dispName || 'Posto Libero'
+              });
           }
       }
 
@@ -934,7 +941,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
               item.innerHTML = `
                 <div>
-                  <strong>${r.vol.nominativo || 'Sconosciuto'}</strong><br>
+                  <strong>${r.dispName}</strong><br>
                   <small style="color:var(--primary-neon, #3b82f6);">${r.label}</small>
                 </div>
                 <button class="btn" style="border-color:var(--neon-orange, #ff9900); color:var(--text-main, #f1f5f9);">Prendi</button>
@@ -1022,8 +1029,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const addDestOption = (roleKey, label, isRequired) => {
           if (isRequired === false) return;
           const volOccupant = eq[roleKey];
-          const isOccupied = !!(volOccupant && (volOccupant.matricola || volOccupant.nominativo));
-          const occupantName = isOccupied ? volOccupant.nominativo || volOccupant.matricola : '';
+          const occupantName = getVolName(volOccupant);
+          const isOccupied = !!occupantName;
           
           const item = document.createElement('div');
           item.className = 'volunteer-item';
