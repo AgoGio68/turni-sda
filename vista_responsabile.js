@@ -867,15 +867,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (turnoObj.equipaggio_attuale) {
           for (const [key, vol] of Object.entries(turnoObj.equipaggio_attuale)) {
               let nomeDaVisualizzare = 'Posto Libero';
+              let isOccupied = false;
               if (vol && vol.nominativo) {
                   nomeDaVisualizzare = vol.nominativo;
+                  isOccupied = true;
               }
               
               ruoliDisponibili.push({ 
                   key: key, 
                   label: labelMap[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')), 
                   vol: vol,
-                  dispName: nomeDaVisualizzare
+                  dispName: nomeDaVisualizzare,
+                  isOccupied: isOccupied
               });
           }
       }
@@ -938,29 +941,40 @@ document.addEventListener('DOMContentLoaded', () => {
               item.style.background = 'rgba(255,255,255,0.05)';
               item.style.border = '1px solid var(--border-glass, rgba(255,255,255,0.1))';
               item.style.borderRadius = '8px';
-              item.style.cursor = 'pointer';
               item.style.display = 'flex';
               item.style.justifyContent = 'space-between';
               item.style.alignItems = 'center';
 
-              item.innerHTML = `
-                <div>
-                  <strong>${r.dispName}</strong><br>
-                  <small style="color:var(--primary-neon, #3b82f6);">${r.label}</small>
-                </div>
-                <button class="btn" style="border-color:var(--neon-orange, #ff9900); color:var(--text-main, #f1f5f9);">Prendi</button>
-              `;
-              
-              item.onclick = () => {
-                  pendingMoveData = {
-                      sourceTurnoId: turnoObj.id,
-                      sourceTurnoDataStr: turnoObj.data + ' ' + (turnoObj.orario?.inizio || ''),
-                      sourceRoleKey: r.key,
-                      volunteer: { ...(r.vol || {}), nominativo: r.dispName }
+              if (r.isOccupied) {
+                  item.style.cursor = 'pointer';
+                  item.innerHTML = `
+                    <div>
+                      <strong>${r.dispName}</strong><br>
+                      <small style="color:var(--primary-neon, #3b82f6);">${r.label}</small>
+                    </div>
+                    <button class="btn" style="border-color:var(--neon-orange, #ff9900); color:var(--text-main, #f1f5f9);">Seleziona questo volontario</button>
+                  `;
+                  
+                  item.onclick = () => {
+                      window.volontarioDaSpostare = r.vol; // Esposto globalmente come richiesto
+                      pendingMoveData = {
+                          sourceTurnoId: turnoObj.id,
+                          sourceTurnoDataStr: turnoObj.data + ' ' + (turnoObj.orario?.inizio || ''),
+                          sourceRoleKey: r.key,
+                          volunteer: { ...(r.vol || {}), nominativo: r.dispName }
+                      };
+                      closeMoveSourceModal();
+                      createDynamicMoveBanner(r.dispName, turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')');
                   };
-                  closeMoveSourceModal();
-                  createDynamicMoveBanner(r.dispName, turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')');
-              };
+              } else {
+                  item.style.opacity = '0.6';
+                  item.innerHTML = `
+                    <div>
+                      <strong style="color:var(--text-muted, #94a3b8);">${r.dispName}</strong><br>
+                      <small style="color:var(--primary-neon, #3b82f6);">${r.label}</small>
+                    </div>
+                  `;
+              }
               listDiv.appendChild(item);
           });
       }
