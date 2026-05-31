@@ -850,10 +850,24 @@ document.addEventListener('DOMContentLoaded', () => {
       const eq = turnoObj.equipaggio_attuale || {};
       
       const ruoliDisponibili = [];
-      if (eq.autista?.matricola) ruoliDisponibili.push({ key: 'autista', label: 'Autista', vol: eq.autista });
-      if (eq.referente_soreu?.matricola) ruoliDisponibili.push({ key: 'referente_soreu', label: 'Referente SOREU', vol: eq.referente_soreu });
-      if (eq.soccorritore?.matricola) ruoliDisponibili.push({ key: 'soccorritore', label: 'Soccorritore', vol: eq.soccorritore });
-      if (eq.allievo_quarto_posto?.matricola) ruoliDisponibili.push({ key: 'allievo_quarto_posto', label: 'Allievo (4° Posto)', vol: eq.allievo_quarto_posto });
+      const labelMap = {
+          'autista': 'Autista MSB',
+          'referente_soreu': 'Socc. Referente per SOREU',
+          'soccorritore': 'Soccorritore',
+          'allievo_quarto_posto': 'Allievo (4° Posto)'
+      };
+
+      if (turnoObj.equipaggio_attuale) {
+          for (const [key, vol] of Object.entries(turnoObj.equipaggio_attuale)) {
+              if (vol && (vol.matricola || vol.nominativo)) {
+                  ruoliDisponibili.push({ 
+                      key: key, 
+                      label: labelMap[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')), 
+                      vol: vol 
+                  });
+              }
+          }
+      }
 
       const overlay = document.createElement('div');
       overlay.id = 'dynamic-modal-move-source';
@@ -1007,7 +1021,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const addDestOption = (roleKey, label, isRequired) => {
           if (isRequired === false) return;
-          const isOccupied = !!eq[roleKey]?.matricola;
+          const volOccupant = eq[roleKey];
+          const isOccupied = !!(volOccupant && (volOccupant.matricola || volOccupant.nominativo));
+          const occupantName = isOccupied ? volOccupant.nominativo || volOccupant.matricola : '';
           
           const item = document.createElement('div');
           item.className = 'volunteer-item';
@@ -1023,7 +1039,7 @@ document.addEventListener('DOMContentLoaded', () => {
           item.innerHTML = `
             <div>
               <strong style="color:var(--primary-neon, #3b82f6);">${label}</strong><br>
-              <small style="${isOccupied ? 'color:var(--neon-red, #ff073a);' : 'color:var(--neon-green, #39ff14);'}">${isOccupied ? 'Occupato (' + eq[roleKey].nominativo + ')' : 'Libero'}</small>
+              <small style="${isOccupied ? 'color:var(--neon-red, #ff073a);' : 'color:var(--neon-green, #39ff14);'}">${isOccupied ? 'Occupato (' + occupantName + ')' : 'Libero'}</small>
             </div>
             <button class="btn" style="border-color:var(--neon-green, #39ff14); color:var(--text-main, #f1f5f9);">Incolla qui</button>
           `;
