@@ -866,12 +866,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (turnoObj.equipaggio_attuale) {
           for (const [key, vol] of Object.entries(turnoObj.equipaggio_attuale)) {
-              let dispName = getVolName(vol);
+              let nomeDaVisualizzare = 'Posto Libero';
+              if (vol && vol.nominativo) {
+                  nomeDaVisualizzare = vol.nominativo;
+              }
+              
               ruoliDisponibili.push({ 
                   key: key, 
                   label: labelMap[key] || (key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')), 
                   vol: vol,
-                  dispName: dispName || 'Posto Libero'
+                  dispName: nomeDaVisualizzare
               });
           }
       }
@@ -952,10 +956,10 @@ document.addEventListener('DOMContentLoaded', () => {
                       sourceTurnoId: turnoObj.id,
                       sourceTurnoDataStr: turnoObj.data + ' ' + (turnoObj.orario?.inizio || ''),
                       sourceRoleKey: r.key,
-                      volunteer: r.vol
+                      volunteer: { ...(r.vol || {}), nominativo: r.dispName }
                   };
                   closeMoveSourceModal();
-                  createDynamicMoveBanner(r.vol.nominativo, turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')');
+                  createDynamicMoveBanner(r.dispName, turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')');
               };
               listDiv.appendChild(item);
           });
@@ -1029,7 +1033,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const addDestOption = (roleKey, label, isRequired) => {
           if (isRequired === false) return;
           const volOccupant = eq[roleKey];
-          const occupantName = getVolName(volOccupant);
+          const occupantName = volOccupant && volOccupant.nominativo ? volOccupant.nominativo : '';
           const isOccupied = !!occupantName;
           
           const item = document.createElement('div');
