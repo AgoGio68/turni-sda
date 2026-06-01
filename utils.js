@@ -81,3 +81,28 @@ export function ordinaUtentiAlfabetico(utentiList) {
         }
     });
 }
+
+export function sanificaTurno(turno) {
+    if (!turno) return turno;
+    
+    const eq = turno.equipaggio_attuale || {};
+    
+    const sanificaSlot = (slot) => {
+        if (!slot || typeof slot !== 'object') return { matricola: null, nominativo: null, convalidato_da_admin: false };
+        return {
+            matricola: slot.matricola || null,
+            nominativo: slot.nominativo || null,
+            convalidato_da_admin: !!slot.convalidato_da_admin
+        };
+    };
+    
+    turno.equipaggio_attuale = {
+        ...eq, // preserve other properties if any
+        autista: sanificaSlot(eq.autista),
+        referente_soreu: sanificaSlot(eq.referente_soreu),
+        soccorritore: sanificaSlot(eq.soccorritore),
+        allievo_quarto_posto: sanificaSlot(eq.allievo_quarto_posto)
+    };
+    
+    return turno;
+}

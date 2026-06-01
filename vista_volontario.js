@@ -11,9 +11,9 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 */
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, query, onSnapshot, doc, updateDoc, getDoc } from "firebase/firestore";
+import { getFirestore, collection, query, onSnapshot, doc, updateDoc, getDoc, runTransaction } from "firebase/firestore";
 import { verificaIscrizione, validaRiposi } from './regole_iscrizione.js';
-import { formattaNominativoUtente, formattaNomeDisplay } from './utils.js';
+import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno } from './utils.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -34,6 +34,7 @@ try {
 }
 
 let currentUser = null;
+let activeUnsubscribeTurni = null;
 
 // Rileva modalità Kiosk dal parametro URL
 const isKioskMode = new URLSearchParams(window.location.search).get('mode') === 'kiosk';
@@ -178,10 +179,14 @@ document.addEventListener('DOMContentLoaded', () => {
       // =====================================================
       //  FIRESTORE: LISTENER REAL-TIME
       // =====================================================
+      if (activeUnsubscribeTurni) {
+          activeUnsubscribeTurni();
+      }
+
       const q = query(collection(db, "turni")); 
       
-      onSnapshot(q, (snapshot) => {
-        turniList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      activeUnsubscribeTurni = onSnapshot(q, (snapshot) => {
+        turniList = snapshot.docs.map(doc => sanificaTurno({ id: doc.id, ...doc.data() }));
         renderMacroCalendar();
         
         if (bottomSheet.classList.contains('active') && currentSelectedDate) {
@@ -251,15 +256,8 @@ document.addEventListener('DOMContentLoaded', () => {
           
           addSlot('autista', 'AUT', eq.autista, req.autista_richiesto);
           addSlot('referente_soreu', 'RIF', eq.referente_soreu, req.referente_richiesto);
-          addSlot('soccorritore', 'SOC', eq.soccorritore, req.soccorritore_richiesto);
+          addSlot('soccorritore', 'DAE', eq.soccorritore, req.soccorritore_richiesto);
           addSlot('allievo_quarto_posto', 'ALL', eq.allievo_quarto_posto, req.allievo_consentito);
-          
-          // Ordinamento: nomi occupati in ordine alfabetico, vuoti in fondo
-          slots.sort((a, b) => {
-              if (a.isEmpty && !b.isEmpty) return 1;
-              if (!a.isEmpty && b.isEmpty) return -1;
-              return a.sortKey.localeCompare(b.sortKey, 'it', { sensitivity: 'base' });
-          });
           
           return slots.map(s => {
               const nameClass = s.isEmpty ? 'crew-vuoto' : (s.isMe ? 'crew-me' : '');
@@ -349,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
               fasce[fascia] = color;
           });
 
-          if(anyCritical) { badgeClass = 'critico'; statoDay = 'Critico'; }
+          if(anyCritical) { badgeClass = 'critico'; statoDay = 'Incompleto'; }
           else if(allFull) { badgeClass = 'pieno'; statoDay = 'Completo'; }
 
           const dateParts = dataString.split('-');
@@ -457,12 +455,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         <strong style="color:var(--text-main); font-size:1.1rem; letter-spacing: 0.5px;">${(turno.tipo_servizio||'').replace(/_/g, ' ')}</strong><br>
                         <span style="color:var(--text-muted); font-size:0.9rem;">🕒 ${turno.orario?.inizio} - ${turno.orario?.fine}</span>
                     </div>
-                    <span class="badge ${turno.stato_turno === 'APERTO' ? 'incompleto' : (turno.stato_turno === 'CRITICO' ? 'critico' : 'convalidato')}">${turno.stato_turno}</span>
+                    <span class="badge ${turno.stato_turno === 'APERTO' ? 'incompleto' : (turno.stato_turno === 'CRITICO' || turno.stato_turno === 'INCOMPLETO' ? 'critico' : 'convalidato')}">${turno.stato_turno === 'CRITICO' ? 'INCOMPLETO' : turno.stato_turno}</span>
                 </div>
                 <div class="shift-slots">
                     ${renderSlotRow(turno, 'autista', 'AUTISTA', eq.autista, req.autista_richiesto, '🚑', turniList)}
                     ${renderSlotRow(turno, 'referente_soreu', 'SOCC. REFERENTE SOREU', eq.referente_soreu, req.referente_richiesto, '📞', turniList)}
-                    ${renderSlotRow(turno, 'soccorritore', 'SOCCORRITORE', eq.soccorritore, req.soccorritore_richiesto, '🎒', turniList)}
+                    ${renderSlotRow(turno, 'soccorritore', 'OPERATORE DAE', eq.soccorritore, req.soccorritore_richiesto, '🎒', turniList)}
                     ${renderSlotRow(turno, 'allievo_quarto_posto', 'ALLIEVO 4° POSTO', eq.allievo_quarto_posto, req.allievo_consentito, '🔰', turniList)}
                 </div>
             `;
@@ -577,72 +575,95 @@ document.addEventListener('DOMContentLoaded', () => {
       // =====================================================
       const rimuoviVolontario = async (idTurno, ruolo) => {
         if(!confirm("Sei sicuro di voler rimuovere questo volontario dal turno?")) return;
-        const turnoTarget = turniList.find(t => t.id === idTurno);
-        if (!turnoTarget) return;
+
+        console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Rimozione da ${idTurno} ruolo ${ruolo}`);
 
         try {
             const docRef = doc(db, "turni", idTurno);
-            const eq = { ...turnoTarget.equipaggio_attuale };
             
-            if (ruolo === 'autista') eq.autista = { matricola: null, nominativo: null, convalidato_da_admin: false };
-            if (ruolo === 'referente_soreu') eq.referente_soreu = { matricola: null, nominativo: null, convalidato_da_admin: false };
-            if (ruolo === 'soccorritore') eq.soccorritore = { matricola: null, nominativo: null, convalidato_da_admin: false };
-            if (ruolo === 'allievo_quarto_posto') eq.allievo_quarto_posto = { matricola: null, nominativo: null, convalidato_da_admin: false };
+            await runTransaction(db, async (transaction) => {
+                const turnoSnap = await transaction.get(docRef);
+                if (!turnoSnap.exists()) throw "Il turno non esiste più nel database.";
+                
+                const turnoData = turnoSnap.data();
+                const eq = { ...turnoData.equipaggio_attuale };
+                
+                if (ruolo === 'autista') eq.autista = { matricola: null, nominativo: null, convalidato_da_admin: false };
+                if (ruolo === 'referente_soreu') eq.referente_soreu = { matricola: null, nominativo: null, convalidato_da_admin: false };
+                if (ruolo === 'soccorritore') eq.soccorritore = { matricola: null, nominativo: null, convalidato_da_admin: false };
+                if (ruolo === 'allievo_quarto_posto') eq.allievo_quarto_posto = { matricola: null, nominativo: null, convalidato_da_admin: false };
 
-            const logs = turnoTarget.log_modifiche || [];
-            logs.push({
-                timestamp: new Date().toISOString(),
-                autore: currentUser.matricola,
-                azione: `Rimozione forzata da admin dello slot ${ruolo.replace(/_/g, ' ')}`,
-                notifica_inviata: false
-            });
+                const logs = turnoData.log_modifiche || [];
+                logs.push({
+                    timestamp: new Date().toISOString(),
+                    autore: currentUser.matricola,
+                    azione: `Rimozione forzata da admin dello slot ${ruolo.replace(/_/g, ' ')}`,
+                    notifica_inviata: false
+                });
 
-            await updateDoc(docRef, {
-                equipaggio_attuale: eq,
-                log_modifiche: logs
+                console.log(`[DEBUG_DB] DATA_INVIO: Dati transazione calcolati`);
+
+                transaction.update(docRef, {
+                    equipaggio_attuale: eq,
+                    log_modifiche: logs
+                });
             });
             
+            console.log(`[DEBUG_DB] CONFERMA_FIRESTORE: Rimozione confermata da DB`);
         } catch (err) {
             console.error("Errore rimozione:", err);
-            alert("Si è verificato un errore di rete durante la rimozione.");
+            alert("Si è verificato un errore di rete durante la rimozione o il turno non esiste più.");
         }
       };
 
       const iscriviti = async (idTurno, ruolo) => {
-        const turnoTarget = turniList.find(t => t.id === idTurno);
-        if (!turnoTarget) return;
+        console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Iscrizione a ${idTurno} ruolo ${ruolo}`);
 
         try {
             const docRef = doc(db, "turni", idTurno);
-            const eq = { ...turnoTarget.equipaggio_attuale };
             
-            const nuovoMembro = {
-                matricola: currentUser.matricola,
-                nominativo: formattaNominativoUtente(currentUser),
-                convalidato_da_admin: false
-            };
+            await runTransaction(db, async (transaction) => {
+                const turnoSnap = await transaction.get(docRef);
+                if (!turnoSnap.exists()) throw "Il turno non esiste più nel database.";
+                
+                const turnoData = turnoSnap.data();
+                const eq = { ...turnoData.equipaggio_attuale };
+                
+                if (eq[ruolo] && eq[ruolo].matricola) {
+                    throw "Lo slot richiesto è stato appena occupato da un altro utente.";
+                }
 
-            if (ruolo === 'autista') eq.autista = nuovoMembro;
-            if (ruolo === 'referente_soreu') eq.referente_soreu = nuovoMembro;
-            if (ruolo === 'soccorritore') eq.soccorritore = nuovoMembro;
-            if (ruolo === 'allievo_quarto_posto') eq.allievo_quarto_posto = nuovoMembro;
+                const nuovoMembro = {
+                    matricola: currentUser.matricola,
+                    nominativo: formattaNominativoUtente(currentUser),
+                    convalidato_da_admin: false
+                };
 
-            const logs = turnoTarget.log_modifiche || [];
-            logs.push({
-                timestamp: new Date().toISOString(),
-                autore: currentUser.matricola,
-                azione: `Iscrizione autonoma come ${ruolo.replace(/_/g, ' ')}`,
-                notifica_inviata: false
+                if (ruolo === 'autista') eq.autista = nuovoMembro;
+                if (ruolo === 'referente_soreu') eq.referente_soreu = nuovoMembro;
+                if (ruolo === 'soccorritore') eq.soccorritore = nuovoMembro;
+                if (ruolo === 'allievo_quarto_posto') eq.allievo_quarto_posto = nuovoMembro;
+
+                const logs = turnoData.log_modifiche || [];
+                logs.push({
+                    timestamp: new Date().toISOString(),
+                    autore: currentUser.matricola,
+                    azione: `Iscrizione autonoma come ${ruolo.replace(/_/g, ' ')}`,
+                    notifica_inviata: false
+                });
+
+                console.log(`[DEBUG_DB] DATA_INVIO: Dati transazione calcolati per iscrizione`);
+
+                transaction.update(docRef, {
+                    equipaggio_attuale: eq,
+                    log_modifiche: logs
+                });
             });
 
-            await updateDoc(docRef, {
-                equipaggio_attuale: eq,
-                log_modifiche: logs
-            });
-            
+            console.log(`[DEBUG_DB] CONFERMA_FIRESTORE: Iscrizione confermata da DB`);
         } catch (err) {
             console.error("Errore iscrizione:", err);
-            alert("Si è verificato un errore di rete durante l'iscrizione.");
+            alert(typeof err === "string" ? err : "Si è verificato un errore di rete durante l'iscrizione.");
         }
       };
   }
