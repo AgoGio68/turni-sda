@@ -627,10 +627,14 @@ document.addEventListener('DOMContentLoaded', () => {
       // =====================================================
       //  CORE: ISCRIZIONE E RIMOZIONE
       // =====================================================
+      let isUpdating = false;
+
       const rimuoviVolontario = async (idTurno, ruolo) => {
+        if(isUpdating) return;
         if(!confirm("Sei sicuro di voler rimuovere te stesso dal turno?")) return;
 
         console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Rimozione da ${idTurno} ruolo ${ruolo}`);
+        isUpdating = true;
 
         try {
             const docRef = doc(db, "turni", idTurno);
@@ -667,13 +671,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error("Errore rimozione:", err);
             alert("Si è verificato un errore di rete durante la rimozione o il turno non esiste più.");
+        } finally {
+            isUpdating = false;
         }
       };
 
       const iscriviti = async (idTurno, ruolo) => {
+        if(isUpdating) return;
         // Modal for custom time selection
         const turnoObj = turniList.find(t => t.id === idTurno);
         if (!turnoObj) return;
+        
+        isUpdating = true;
         
         const myIdStr = String(currentUser.matricola);
         const myShifts = turniList.reduce((acc, t) => {
@@ -772,14 +781,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error("Errore iscrizione:", err);
             alert(typeof err === "string" ? err : "Si è verificato un errore di rete durante l'iscrizione.");
+        } finally {
+            isUpdating = false;
         }
       };
 
       const modificaOrarioFine = async (idTurno, ruolo, orarioFineAttuale) => {
+          if(isUpdating) return;
           const userFine = prompt("A che ora finisci?", orarioFineAttuale);
           if (!userFine || userFine === orarioFineAttuale) return;
 
           console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Modifica orario fine a ${idTurno} ruolo ${ruolo} per ${userFine}`);
+          isUpdating = true;
 
           try {
               const docRef = doc(db, "turni", idTurno);
@@ -821,6 +834,8 @@ document.addEventListener('DOMContentLoaded', () => {
           } catch (err) {
               console.error("Errore modifica orario:", err);
               alert(typeof err === "string" ? err : "Si è verificato un errore di rete durante la modifica.");
+          } finally {
+              isUpdating = false;
           }
       };
   }
