@@ -724,7 +724,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const eq = { ...turnoData.equipaggio_attuale };
                 
                 const ruoloArr = eq[ruolo] || [];
-                const checkOverlap = calcolaCoperturaRuolo([...ruoloArr, { inizio: userInizio, fine: userFine }], shiftStart, shiftEnd);
+                // Escludi l'utente corrente per evitare false "sovrapposizioni" con se stesso durante l'update/overwrite
+                const filteredRuoloArr = ruoloArr.filter(a => String(a.matricola) !== String(currentUser.matricola));
+                
+                const checkOverlap = calcolaCoperturaRuolo([...filteredRuoloArr, { inizio: userInizio, fine: userFine }], shiftStart, shiftEnd);
                 if (checkOverlap.overlaps) {
                     throw "Sovrapposizione di orari per lo stesso ruolo!";
                 }
@@ -738,7 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     is_dipendente: !!currentUser.is_dipendente
                 };
 
-                eq[ruolo] = [...ruoloArr, nuovoMembro];
+                eq[ruolo] = [...filteredRuoloArr, nuovoMembro];
 
                 const logs = turnoData.log_modifiche || [];
                 logs.push({
