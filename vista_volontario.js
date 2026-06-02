@@ -187,6 +187,14 @@ document.addEventListener('DOMContentLoaded', () => {
       
       activeUnsubscribeTurni = onSnapshot(q, (snapshot) => {
         turniList = snapshot.docs.map(doc => sanificaTurno({ id: doc.id, ...doc.data() }));
+        
+        // Se c'è un aggiornamento in corso (es. l'utente ha modificato l'orario), non distruggiamo il DOM.
+        // I dati in turniList sono aggiornati, ma l'UI viene lasciata ferma per evitare "flicker" e doppi click.
+        if (isUpdating) {
+            console.log("[DEBUG_DB] onSnapshot ricevuto ma render ignorato perché isUpdating = true");
+            return;
+        }
+
         renderMacroCalendar();
         
         if (bottomSheet.classList.contains('active') && currentSelectedDate) {
@@ -504,7 +512,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const idTurno = e.currentTarget.getAttribute('data-turno');
                 const ruolo = e.currentTarget.getAttribute('data-ruolo');
                 const orarioFine = e.currentTarget.getAttribute('data-fine');
-                await modificaOrarioFine(idTurno, ruolo, orarioFine);
+                await modificaOrarioFine(idTurno, ruolo, orarioFine, e.currentTarget);
             });
         });
       };
@@ -786,13 +794,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       };
 
-      const modificaOrarioFine = async (idTurno, ruolo, orarioFineAttuale) => {
+      const modificaOrarioFine = async (idTurno, ruolo, orarioFineAttuale, btnElement) => {
           if(isUpdating) return;
           const userFine = prompt("A che ora finisci?", orarioFineAttuale);
           if (!userFine || userFine === orarioFineAttuale) return;
 
           console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Modifica orario fine a ${idTurno} ruolo ${ruolo} per ${userFine}`);
-          isUpdating = true;
+          isUpdating = true; // Blocca il rendering su onSnapshot
 
           try {
               const docRef = doc(db, "turni", idTurno);
@@ -830,12 +838,33 @@ document.addEventListener('DOMContentLoaded', () => {
                   });
               });
 
+              // AGGIORNAMENTO LOCALE DELLA UI (Leggero)
+              if (btnElement) {
+                  btnElement.setAttribute('data-fine', userFine);
+                  const textSpan = btnElement.previousElementSibling;
+                  if (textSpan && textSpan.tagName === 'SPAN') {
+                      const text = textSpan.innerText;
+                      const bracketIndex = text.indexOf('[');
+                      if (bracketIndex !== -1) {
+                          const namePart = text.substring(0, bracketIndex);
+                          const match = text.match(/\[(.*?)-(.*?)\]/);
+                          if (match) {
+                              textSpan.innerText = `${namePart}[${match[1]}-${userFine}]`;
+                          }
+                      }
+                  }
+              }
+
               console.log(`[DEBUG_DB] CONFERMA_FIRESTORE: Modifica orario confermata da DB`);
           } catch (err) {
               console.error("Errore modifica orario:", err);
               alert(typeof err === "string" ? err : "Si è verificato un errore di rete durante la modifica.");
           } finally {
-              isUpdating = false;
+              // Manteniamo isUpdating a true per un istante per assicurarci che l'onSnapshot generato
+              // dal salvataggio locale venga ignorato, prevenendo il ricaricamento del DOM.
+              setTimeout(() => {
+                  isUpdating = false;
+              }, 1500);
           }
       };
   }
