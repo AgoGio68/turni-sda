@@ -90,14 +90,14 @@ export function sanificaTurno(turno) {
     const sanificaSlot = (slot, inizioTurno, fineTurno) => {
         if (!slot) return [];
         if (Array.isArray(slot)) {
-            return slot.map(s => ({
-                matricola: s.matricola || null,
+            return slot.filter(s => s && typeof s === 'object' && s.matricola).map(s => ({
+                matricola: s.matricola,
                 nominativo: s.nominativo || null,
                 convalidato_da_admin: !!s.convalidato_da_admin,
                 inizio: s.inizio || inizioTurno,
                 fine: s.fine || fineTurno,
                 is_dipendente: !!s.is_dipendente
-            })).filter(s => s.matricola);
+            }));
         }
         if (typeof slot === 'object') {
             if (slot.matricola) {
@@ -110,16 +110,16 @@ export function sanificaTurno(turno) {
                     is_dipendente: !!slot.is_dipendente
                 }];
             } else {
-                const values = Object.values(slot);
-                if (values.length > 0 && typeof values[0] === 'object' && values[0].matricola) {
+                const values = Object.values(slot).filter(v => v && typeof v === 'object' && v.matricola);
+                if (values.length > 0) {
                     return values.map(s => ({
-                        matricola: s.matricola || null,
+                        matricola: s.matricola,
                         nominativo: s.nominativo || null,
                         convalidato_da_admin: !!s.convalidato_da_admin,
                         inizio: s.inizio || inizioTurno,
                         fine: s.fine || fineTurno,
                         is_dipendente: !!s.is_dipendente
-                    })).filter(s => s.matricola);
+                    }));
                 }
                 return []; // Empty old format
             }
