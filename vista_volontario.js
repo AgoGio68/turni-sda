@@ -13,7 +13,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, query, onSnapshot, doc, updateDoc, getDoc, runTransaction } from "firebase/firestore";
 import { verificaIscrizione, validaRiposi } from './regole_iscrizione.js';
-import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo } from './utils.js';
+import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo, calcolaBuchiRuolo } from './utils.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -690,8 +690,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const shiftStart = turnoObj.orario?.inizio || "06:00";
         const shiftEnd = turnoObj.orario?.fine || "20:00";
         
-        const userInizio = shiftStart;
-        const userFine = shiftEnd;
+        let userInizio = shiftStart;
+        let userFine = shiftEnd;
         
         // Verifica riposi custom
         let riposoCheck = { idoneo: true, motivo: "" };
@@ -724,8 +724,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 const eq = { ...turnoData.equipaggio_attuale };
                 
                 const ruoloArr = eq[ruolo] || [];
-                // Escludi l'utente corrente per evitare false "sovrapposizioni" con se stesso durante l'update/overwrite
+                // Escludi l'utente corrente per calcolare i veri buchi lasciati dagli ALTRI volontari
                 const filteredRuoloArr = ruoloArr.filter(a => String(a.matricola) !== String(currentUser.matricola));
+                
+                const buchi = calcolaBuchiRuolo(filteredRuoloArr, shiftStart, shiftEnd);
+                if (buchi.length === 0) {
+                    throw "Non ci sono più orari disponibili in questo ruolo!";
+                }
+                
+                // Assegna automaticamente il primo buco libero
+                userInizio = buchi[0].inizio;
+                userFine = buchi[0].fine;
                 
                 const checkOverlap = calcolaCoperturaRuolo([...filteredRuoloArr, { inizio: userInizio, fine: userFine }], shiftStart, shiftEnd);
                 if (checkOverlap.overlaps) {
