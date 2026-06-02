@@ -87,22 +87,133 @@ export function sanificaTurno(turno) {
     
     const eq = turno.equipaggio_attuale || {};
     
-    const sanificaSlot = (slot) => {
-        if (!slot || typeof slot !== 'object') return { matricola: null, nominativo: null, convalidato_da_admin: false };
-        return {
-            matricola: slot.matricola || null,
-            nominativo: slot.nominativo || null,
-            convalidato_da_admin: !!slot.convalidato_da_admin
-        };
+    const sanificaSlot = (slot, inizioTurno, fineTurno) => {
+        if (!slot) return [];
+        if (Array.isArray(slot)) {
+            return slot.map(s => ({
+                matricola: s.matricola || null,
+                nominativo: s.nominativo || null,
+                convalidato_da_admin: !!s.convalidato_da_admin,
+                inizio: s.inizio || inizioTurno,
+                fine: s.fine || fineTurno,
+                is_dipendente: !!s.is_dipendente
+            })).filter(s => s.matricola);
+        }
+        if (typeof slot === 'object') {
+            if (slot.matricola) {
+                return [{
+                    matricola: slot.matricola,
+                    nominativo: slot.nominativo || null,
+                    convalidato_da_admin: !!slot.convalidato_da_admin,
+                    inizio: slot.inizio || inizioTurno,
+                    fine: slot.fine || fineTurno,
+                    is_dipendente: !!slot.is_dipendente
+                }];
+            } else {
+                const values = Object.values(slot);
+                if (values.length > 0 && typeof values[0] === 'object' && values[0].matricola) {
+                    return values.map(s => ({
+                        matricola: s.matricola || null,
+                        nominativo: s.nominativo || null,
+                        convalidato_da_admin: !!s.convalidato_da_admin,
+                        inizio: s.inizio || inizioTurno,
+                        fine: s.fine || fineTurno,
+                        is_dipendente: !!s.is_dipendente
+                    })).filter(s => s.matricola);
+                }
+                return []; // Empty old format
+            }
+        }
+        return [];
     };
     
+    const inizio = turno.orario?.inizio || "00:00";
+    const fine = turno.orario?.fine || "00:00";
+
     turno.equipaggio_attuale = {
-        ...eq, // preserve other properties if any
-        autista: sanificaSlot(eq.autista),
-        referente_soreu: sanificaSlot(eq.referente_soreu),
-        soccorritore: sanificaSlot(eq.soccorritore),
-        allievo_quarto_posto: sanificaSlot(eq.allievo_quarto_posto)
+        ...eq,
+        autista: sanificaSlot(eq.autista, inizio, fine),
+        referente_soreu: sanificaSlot(eq.referente_soreu, inizio, fine),
+        soccorritore: sanificaSlot(eq.soccorritore, inizio, fine),
+        allievo_quarto_posto: sanificaSlot(eq.allievo_quarto_posto, inizio, fine)
     };
     
     return turno;
+}
+
+export function timeToMinutes(t) {
+    if (!t) return 0;
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+}
+
+export function calcolaCoperturaRuolo(assegnazioni, inizioTurno, fineTurno) {
+    if (!assegnazioni || assegnazioni.length === 0) return { isFull: false, overlaps: false };
+    
+    let startMin = timeToMinutes(inizioTurno);
+    let endMin = timeToMinutes(fineTurno);
+    if (endMin <= startMin) endMin += 24 * 60; // notte
+    
+    const intervals = assegnazioni.map(a => {
+        let s = timeToMinutes(a.inizio);
+        let e = timeToMinutes(a.fine);
+        // Normalize for night shifts
+        if (s < 12 * 60 && startMin > 12 * 60) s += 24 * 60;
+        if (e <= s) e += 24 * 60;
+        return { start: s, end: e, data: a };
+    }).sort((a, b) => a.start - b.start);
+
+    let currentEnd = startMin;
+    let isFull = true;
+    let overlaps = false;
+
+    for (const inv of intervals) {
+        if (inv.start < currentEnd) overlaps = true;
+        if (inv.start > currentEnd) isFull = false;
+        currentEnd = Math.max(currentEnd, inv.end);
+    }
+    
+    if (currentEnd < endMin) isFull = false;
+    
+    return { isFull, overlaps };
+}
+
+export function calcolaBuchiRuolo(assegnazioni, inizioTurno, fineTurno) {
+    let startMin = timeToMinutes(inizioTurno);
+    let endMin = timeToMinutes(fineTurno);
+    if (endMin <= startMin) endMin += 24 * 60; // notte
+    
+    if (!assegnazioni || assegnazioni.length === 0) {
+        return [{ inizio: inizioTurno, fine: fineTurno }];
+    }
+
+    const intervals = assegnazioni.map(a => {
+        let s = timeToMinutes(a.inizio);
+        let e = timeToMinutes(a.fine);
+        if (s < 12 * 60 && startMin > 12 * 60) s += 24 * 60;
+        if (e <= s) e += 24 * 60;
+        return { start: s, end: e };
+    }).sort((a, b) => a.start - b.start);
+
+    let currentEnd = startMin;
+    const buchi = [];
+
+    const formatTime = (mins) => {
+        const h = Math.floor((mins % (24 * 60)) / 60);
+        const m = mins % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    };
+
+    for (const inv of intervals) {
+        if (inv.start > currentEnd) {
+            buchi.push({ inizio: formatTime(currentEnd), fine: formatTime(inv.start) });
+        }
+        currentEnd = Math.max(currentEnd, inv.end);
+    }
+    
+    if (currentEnd < endMin) {
+        buchi.push({ inizio: formatTime(currentEnd), fine: formatTime(endMin) });
+    }
+    
+    return buchi;
 }

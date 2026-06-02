@@ -13,7 +13,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, query, onSnapshot, doc, updateDoc, getDoc, runTransaction } from "firebase/firestore";
 import { verificaIscrizione, validaRiposi } from './regole_iscrizione.js';
-import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno } from './utils.js';
+import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo } from './utils.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -209,10 +209,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const getUserRoleInShift = (turno) => {
           const eq = turno.equipaggio_attuale || {};
           const myId = String(currentUser.matricola);
-          if (eq.autista?.matricola && String(eq.autista.matricola) === myId) return 'Autista';
-          if (eq.referente_soreu?.matricola && String(eq.referente_soreu.matricola) === myId) return 'Rif. SOREU';
-          if (eq.soccorritore?.matricola && String(eq.soccorritore.matricola) === myId) return 'Soccorritore';
-          if (eq.allievo_quarto_posto?.matricola && String(eq.allievo_quarto_posto.matricola) === myId) return 'Allievo';
+          if (eq.autista && eq.autista.some(a => String(a.matricola) === myId)) return 'Autista';
+          if (eq.referente_soreu && eq.referente_soreu.some(a => String(a.matricola) === myId)) return 'Rif. SOREU';
+          if (eq.soccorritore && eq.soccorritore.some(a => String(a.matricola) === myId)) return 'Soccorritore';
+          if (eq.allievo_quarto_posto && eq.allievo_quarto_posto.some(a => String(a.matricola) === myId)) return 'Allievo';
           return null;
       };
 
@@ -225,23 +225,23 @@ document.addEventListener('DOMContentLoaded', () => {
           
           const slots = [];
           
-          const addSlot = (key, label, membro, richiesto) => {
+          const addSlot = (key, label, assegnazioni, richiesto) => {
               if (!richiesto && key !== 'allievo_quarto_posto') return;
               if (key === 'allievo_quarto_posto' && !richiesto) return;
               
-              if (membro?.matricola) {
-                  const isMe = String(membro.matricola) === String(currentUser.matricola);
-                  // Usa il nominativo già formattato se presente, altrimenti fallback
-                  const nomeDb = membro.nominativo || 'Sconosciuto';
-                  const nomeDisplay = nomeDb !== 'Sconosciuto' ? formattaNomeDisplay(nomeDb) : nomeDb;
-                  const textColor = membro.convalidato_da_admin ? '#32CD32' : '#FFD700';
-                  slots.push({
-                      label,
-                      nome: `<span style="color:${textColor}; font-weight:bold;">${nomeDisplay}</span>`,
-                      isMe,
-                      isEmpty: false,
-                      // Per ordinamento: estrai cognome dal nominativo "Cognome, Nome - Matricola"
-                      sortKey: nomeDb
+              if (assegnazioni && assegnazioni.length > 0) {
+                  assegnazioni.forEach(membro => {
+                      const isMe = String(membro.matricola) === String(currentUser.matricola);
+                      const nomeDb = membro.nominativo || 'Sconosciuto';
+                      const nomeDisplay = nomeDb !== 'Sconosciuto' ? formattaNomeDisplay(nomeDb) : nomeDb;
+                      const textColor = membro.convalidato_da_admin ? '#32CD32' : '#FFD700';
+                      slots.push({
+                          label,
+                          nome: `<span style="color:${textColor}; font-weight:bold;">${nomeDisplay}</span> (${membro.inizio}-${membro.fine})`,
+                          isMe,
+                          isEmpty: false,
+                          sortKey: nomeDb
+                      });
                   });
               } else {
                   slots.push({
@@ -249,7 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
                       nome: 'DA COPRIRE',
                       isMe: false,
                       isEmpty: true,
-                      sortKey: 'ZZZZZ' // va in fondo
+                      sortKey: 'ZZZZZ'
                   });
               }
           };
@@ -326,13 +326,14 @@ document.addEventListener('DOMContentLoaded', () => {
               const eq = t.equipaggio_attuale || {};
               const req = t.requisiti_equipaggio || {};
               
-              const aut = !req.autista_richiesto || !!eq.autista?.matricola;
-              const ref = !req.referente_richiesto || !!eq.referente_soreu?.matricola;
-              const soc = !req.soccorritore_richiesto || !!eq.soccorritore?.matricola;
-              const all = !req.allievo_consentito || !!eq.allievo_quarto_posto?.matricola;
+              const inizioTurno = t.orario?.inizio || "00:00";
+              const fineTurno = t.orario?.fine || "00:00";
+              const aut = !req.autista_richiesto || calcolaCoperturaRuolo(eq.autista, inizioTurno, fineTurno).isFull;
+              const ref = !req.referente_richiesto || calcolaCoperturaRuolo(eq.referente_soreu, inizioTurno, fineTurno).isFull;
+              const soc = !req.soccorritore_richiesto || calcolaCoperturaRuolo(eq.soccorritore, inizioTurno, fineTurno).isFull;
 
               const isCritico = !aut || !ref || !soc;
-              const isFull = aut && ref && soc && all;
+              const isFull = aut && ref && soc;
 
               if (isCritico) anyCritical = true;
               if (!isFull) allFull = false;
@@ -449,13 +450,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const eq = turno.equipaggio_attuale || {};
             const req = turno.requisiti_equipaggio || {};
 
+            let currentStato = turno.stato_turno || 'APERTO';
+            const inizioTurno = turno.orario?.inizio || "00:00";
+            const fineTurno = turno.orario?.fine || "00:00";
+            
+            const aut = !req.autista_richiesto || calcolaCoperturaRuolo(eq.autista, inizioTurno, fineTurno).isFull;
+            const ref = !req.referente_richiesto || calcolaCoperturaRuolo(eq.referente_soreu, inizioTurno, fineTurno).isFull;
+            const soc = !req.soccorritore_richiesto || calcolaCoperturaRuolo(eq.soccorritore, inizioTurno, fineTurno).isFull;
+            
+            if (!aut || !ref || !soc) {
+                currentStato = 'INCOMPLETO';
+            } else if (currentStato !== 'CONVALIDATO') {
+                currentStato = 'COMPLETO';
+            }
+            const bgClass = (currentStato === 'COMPLETO' || currentStato === 'CONVALIDATO') ? 'pieno' : 'critico';
+
             card.innerHTML = `
                 <div class="shift-header">
                     <div>
                         <strong style="color:var(--text-main); font-size:1.1rem; letter-spacing: 0.5px;">${(turno.tipo_servizio||'').replace(/_/g, ' ')}</strong><br>
                         <span style="color:var(--text-muted); font-size:0.9rem;">🕒 ${turno.orario?.inizio} - ${turno.orario?.fine}</span>
                     </div>
-                    <span class="badge ${turno.stato_turno === 'APERTO' ? 'incompleto' : (turno.stato_turno === 'CRITICO' || turno.stato_turno === 'INCOMPLETO' ? 'critico' : 'convalidato')}">${turno.stato_turno === 'CRITICO' ? 'INCOMPLETO' : turno.stato_turno}</span>
+                    <span class="badge ${bgClass}">${currentStato}</span>
                 </div>
                 <div class="shift-slots">
                     ${renderSlotRow(turno, 'autista', 'AUTISTA', eq.autista, req.autista_richiesto, '🚑', turniList)}
@@ -482,99 +498,137 @@ document.addEventListener('DOMContentLoaded', () => {
                 await rimuoviVolontario(idTurno, ruolo);
             });
         });
+
+        document.querySelectorAll('.btn-edit-time').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const idTurno = e.currentTarget.getAttribute('data-turno');
+                const ruolo = e.currentTarget.getAttribute('data-ruolo');
+                const orarioFine = e.currentTarget.getAttribute('data-fine');
+                await modificaOrarioFine(idTurno, ruolo, orarioFine);
+            });
+        });
       };
 
       // =====================================================
-      //  RENDERING: SLOT ROW (invariato nella logica core)
+      //  RENDERING: SLOT ROW
       // =====================================================
-      const renderSlotRow = (turno, keyRuolo, labelRuolo, membro, richiesto, icon, fullTurniList) => {
+      const renderSlotRow = (turno, keyRuolo, labelRuolo, assegnazioni, richiesto, icon, fullTurniList) => {
         if(!richiesto && keyRuolo !== 'allievo_quarto_posto') return ''; 
         if(keyRuolo === 'allievo_quarto_posto' && !richiesto) return ''; 
 
-        if (membro?.matricola) {
-            const isMe = String(membro.matricola) === String(currentUser.matricola);
-            const nomeDb = membro.nominativo || 'Sconosciuto';
-            const nomeDisplay = nomeDb !== 'Sconosciuto' ? formattaNomeDisplay(nomeDb) : nomeDb;
-            const textColor = membro.convalidato_da_admin ? '#32CD32' : '#FFD700';
-            const textContent = isMe ? `Tu (${nomeDisplay})` : nomeDisplay;
-            
-            const isAdmin = currentUser.ruolo === 'admin' || currentUser.ruolo === 'superadmin' || currentUser.is_admin === true;
-            const btnRemoveHtml = isAdmin ? `<button class="btn-remove-vol" data-turno="${turno.id}" data-ruolo="${keyRuolo}" title="Rimuovi Volontario" style="background:transparent; border:none; cursor:pointer; margin-left:0.5rem;">❌</button>` : '';
+        let html = '';
+        const myIdStr = String(currentUser.matricola);
+        
+        let iAmInThisRole = false;
 
-            const nomeStampato = `<span style="color:${textColor}; font-weight:bold;">${textContent}</span>${btnRemoveHtml}`;
-            const statoStr = membro.convalidato_da_admin ? '<span class="status-badge status-conv">[CONVALIDATO]</span>' : '<span class="status-badge status-wait">[IN ATTESA]</span>';
-            const rowColorClass = membro.convalidato_da_admin ? 'slot-confermato' : 'slot-prenotato';
-            
-            return `
-                <div class="slot-row ${rowColorClass}">
-                    <div class="slot-info">
-                        <span class="slot-icon">${icon}</span>
-                        <div>
-                            <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">${labelRuolo}</div>
-                            <div style="font-weight:600; color:var(--text-main); font-size:1rem;">👑 ${nomeStampato}</div>
+        if (assegnazioni && assegnazioni.length > 0) {
+            assegnazioni.forEach(membro => {
+                const isMe = String(membro.matricola) === String(currentUser.matricola);
+                if (isMe) iAmInThisRole = true;
+                
+                const nomeDb = membro.nominativo || 'Sconosciuto';
+                const nomeDisplay = nomeDb !== 'Sconosciuto' ? formattaNomeDisplay(nomeDb) : nomeDb;
+                const textColor = membro.convalidato_da_admin ? '#32CD32' : '#FFD700';
+                const textContent = isMe ? `Tu (${nomeDisplay}) [${membro.inizio}-${membro.fine}]` : `${nomeDisplay} [${membro.inizio}-${membro.fine}]`;
+                
+                const isAdmin = currentUser.ruolo === 'admin' || currentUser.ruolo === 'superadmin' || currentUser.is_admin === true;
+                const btnRemoveHtml = (isAdmin || isMe) ? `<button class="btn-remove-vol" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-matricola="${membro.matricola}" title="Rimuovi" style="background:transparent; border:none; cursor:pointer; margin-left:0.5rem;">❌</button>` : '';
+                const btnEditHtml = isMe ? `<button class="btn-edit-time" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-fine="${membro.fine}" title="Modifica Orario Fine" style="background:transparent; border:none; cursor:pointer; margin-left:0.2rem; font-size:1rem;">✏️</button>` : '';
+
+                const nomeStampato = `<span style="color:${textColor}; font-weight:bold;">${textContent}</span>${btnEditHtml}${btnRemoveHtml}`;
+                const statoStr = membro.convalidato_da_admin ? '<span class="status-badge status-conv">[CONVALIDATO]</span>' : '<span class="status-badge status-wait">[IN ATTESA]</span>';
+                const rowColorClass = membro.convalidato_da_admin ? 'slot-confermato' : 'slot-prenotato';
+                
+                html += `
+                    <div class="slot-row ${rowColorClass}">
+                        <div class="slot-info">
+                            <span class="slot-icon">${icon}</span>
+                            <div>
+                                <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">${labelRuolo}</div>
+                                <div style="font-weight:600; color:var(--text-main); font-size:1rem;">👑 ${nomeStampato}</div>
+                            </div>
                         </div>
+                        ${statoStr}
                     </div>
-                    ${statoStr}
-                </div>
-            `;
-        } else {
+                `;
+            });
+        }
+        
+        const isFull = calcolaCoperturaRuolo(assegnazioni, turno.orario?.inizio || "00:00", turno.orario?.fine || "00:00").isFull;
+
+        if (!isFull) {
             const eqCompleto = turno.equipaggio_attuale || {};
-            const myIdStr = String(currentUser.matricola);
-            const giaNelTurno = (eqCompleto.autista?.matricola && String(eqCompleto.autista.matricola) === myIdStr) || 
-                                (eqCompleto.referente_soreu?.matricola && String(eqCompleto.referente_soreu.matricola) === myIdStr) ||
-                                (eqCompleto.soccorritore?.matricola && String(eqCompleto.soccorritore.matricola) === myIdStr) ||
-                                (eqCompleto.allievo_quarto_posto?.matricola && String(eqCompleto.allievo_quarto_posto.matricola) === myIdStr);
+            const giaNelTurno = ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].some(r => 
+                eqCompleto[r] && eqCompleto[r].some(a => String(a.matricola) === myIdStr)
+            );
 
-            const myShifts = fullTurniList.filter(t => {
-                if (t.id === turno.id) return false;
+            // Costruiamo myShifts con inizio e fine specifici dell'assegnazione
+            const myShifts = fullTurniList.reduce((acc, t) => {
+                if (t.id === turno.id) return acc;
                 const e = t.equipaggio_attuale || {};
-                return (e.autista?.matricola && String(e.autista.matricola) === myIdStr) || 
-                       (e.referente_soreu?.matricola && String(e.referente_soreu.matricola) === myIdStr) ||
-                       (e.soccorritore?.matricola && String(e.soccorritore.matricola) === myIdStr) ||
-                       (e.allievo_quarto_posto?.matricola && String(e.allievo_quarto_posto.matricola) === myIdStr);
-            }).map(t => ({
-                data: t.data,
-                inizio: t.orario?.inizio || "00:00",
-                fine: t.orario?.fine || "00:00"
-            }));
+                ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(r => {
+                    if (e[r]) {
+                        e[r].forEach(a => {
+                            if (String(a.matricola) === myIdStr) {
+                                acc.push({ data: t.data, inizio: a.inizio, fine: a.fine });
+                            }
+                        });
+                    }
+                });
+                return acc;
+            }, []);
 
-            const riposoCheck = validaRiposi(turno.data, turno.orario?.inizio || "00:00", turno.orario?.fine || "00:00", myShifts);
+            // Riposo checks for default shift times (will be re-checked in the modal with exact times)
+            let riposoCheck = { idoneo: true, motivo: "" };
+            try {
+                if (typeof validaRiposi === 'function') {
+                    riposoCheck = validaRiposi(turno.data, turno.orario?.inizio || "00:00", turno.orario?.fine || "00:00", myShifts);
+                } else {
+                    console.warn("Warning: validaRiposi is not defined. Ignorato controllo riposi.");
+                }
+            } catch (e) {
+                console.error("Errore durante il controllo riposi in fase di render:", e);
+            }
             const regole = verificaIscrizione(currentUser, turno, keyRuolo);
             let btnStr = '';
 
-            if (giaNelTurno) {
-                btnStr = '<span style="font-size:0.75rem; color:var(--neon-green)">Sei in questo equipaggio</span>';
+            if (giaNelTurno && !iAmInThisRole) {
+                btnStr = '<span style="font-size:0.75rem; color:var(--neon-green)">Sei in un altro ruolo</span>';
+            } else if (giaNelTurno && iAmInThisRole) {
+                btnStr = `<button class="btn btn-take" data-turno="${turno.id}" data-ruolo="${keyRuolo}">Copri Altro Orario</button>`;
             } else if (isKioskMode) {
-                // Kiosk: nessun bottone, sola lettura
                 btnStr = '';
-            } else if (!riposoCheck.idoneo) {
-                btnStr = `<span style="font-size:0.7rem; color:var(--neon-orange); text-align:right; max-width: 140px; line-height:1.2;" title="${riposoCheck.motivo}">Blocco 118:<br>${riposoCheck.motivo}</span>`;
+            } else if (!riposoCheck.idoneo && !iAmInThisRole) {
+                // Avvertimento generale, potrebbe iscriversi a slot che non viola
+                btnStr = `<button class="btn btn-take" data-turno="${turno.id}" data-ruolo="${keyRuolo}">Verifica Orari</button>`;
             } else if (!regole.idoneo) {
                 btnStr = `<span style="font-size:0.75rem; color:var(--text-muted);" title="${regole.motivo}">Non Idoneo</span>`;
             } else {
                 btnStr = `<button class="btn btn-take" data-turno="${turno.id}" data-ruolo="${keyRuolo}">Prendi Turno</button>`;
             }
 
-            return `
+            html += `
                 <div class="slot-row">
                     <div class="slot-info">
                         <span class="slot-icon" style="opacity:0.3">${icon}</span>
                         <div>
                             <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">${labelRuolo}</div>
-                            <div style="font-weight:600; color:var(--neon-red); font-style:italic; font-size:0.9rem;">🛞 [Posto Vuoto]</div>
+                            <div style="font-weight:600; color:var(--neon-red); font-style:italic; font-size:0.9rem;">🛞 [Posto Disponibile]</div>
                         </div>
                     </div>
                     ${btnStr}
                 </div>
             `;
         }
+
+        return html;
       };
 
       // =====================================================
       //  CORE: ISCRIZIONE E RIMOZIONE
       // =====================================================
       const rimuoviVolontario = async (idTurno, ruolo) => {
-        if(!confirm("Sei sicuro di voler rimuovere questo volontario dal turno?")) return;
+        if(!confirm("Sei sicuro di voler rimuovere te stesso dal turno?")) return;
 
         console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Rimozione da ${idTurno} ruolo ${ruolo}`);
 
@@ -585,19 +639,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const turnoSnap = await transaction.get(docRef);
                 if (!turnoSnap.exists()) throw "Il turno non esiste più nel database.";
                 
-                const turnoData = turnoSnap.data();
+                const turnoDataRaw = turnoSnap.data();
+                const turnoData = sanificaTurno({ ...turnoDataRaw, orario: turnoDataRaw.orario || { inizio: "00:00", fine: "00:00" } });
                 const eq = { ...turnoData.equipaggio_attuale };
                 
-                if (ruolo === 'autista') eq.autista = { matricola: null, nominativo: null, convalidato_da_admin: false };
-                if (ruolo === 'referente_soreu') eq.referente_soreu = { matricola: null, nominativo: null, convalidato_da_admin: false };
-                if (ruolo === 'soccorritore') eq.soccorritore = { matricola: null, nominativo: null, convalidato_da_admin: false };
-                if (ruolo === 'allievo_quarto_posto') eq.allievo_quarto_posto = { matricola: null, nominativo: null, convalidato_da_admin: false };
+                if (eq[ruolo]) {
+                    eq[ruolo] = eq[ruolo].filter(a => String(a.matricola) !== String(currentUser.matricola));
+                }
 
                 const logs = turnoData.log_modifiche || [];
                 logs.push({
                     timestamp: new Date().toISOString(),
                     autore: currentUser.matricola,
-                    azione: `Rimozione forzata da admin dello slot ${ruolo.replace(/_/g, ' ')}`,
+                    azione: `Rimozione utente per slot ${ruolo.replace(/_/g, ' ')}`,
                     notifica_inviata: false
                 });
 
@@ -617,6 +671,45 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       const iscriviti = async (idTurno, ruolo) => {
+        // Modal for custom time selection
+        const turnoObj = turniList.find(t => t.id === idTurno);
+        if (!turnoObj) return;
+        
+        const myIdStr = String(currentUser.matricola);
+        const myShifts = turniList.reduce((acc, t) => {
+            if (t.id === idTurno) return acc;
+            const e = t.equipaggio_attuale || {};
+            ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(r => {
+                if (e[r]) e[r].forEach(a => {
+                    if (String(a.matricola) === myIdStr) acc.push({ data: t.data, inizio: a.inizio, fine: a.fine });
+                });
+            });
+            return acc;
+        }, []);
+
+        const shiftStart = turnoObj.orario?.inizio || "06:00";
+        const shiftEnd = turnoObj.orario?.fine || "20:00";
+        
+        const userInizio = shiftStart;
+        const userFine = shiftEnd;
+        
+        // Verifica riposi custom
+        let riposoCheck = { idoneo: true, motivo: "" };
+        try {
+            if (typeof validaRiposi === 'function') {
+                riposoCheck = validaRiposi(turnoObj.data, userInizio, userFine, myShifts);
+            } else {
+                console.warn("Warning: validaRiposi is not defined. Ignorato controllo riposi custom.");
+            }
+        } catch (e) {
+            console.error("Errore durante il controllo riposi custom:", e);
+        }
+        
+        if (!riposoCheck.idoneo) {
+            alert(`Impossibile iscriverti: ${riposoCheck.motivo}`);
+            return;
+        }
+
         console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Iscrizione a ${idTurno} ruolo ${ruolo}`);
 
         try {
@@ -626,29 +719,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 const turnoSnap = await transaction.get(docRef);
                 if (!turnoSnap.exists()) throw "Il turno non esiste più nel database.";
                 
-                const turnoData = turnoSnap.data();
+                const turnoDataRaw = turnoSnap.data();
+                const turnoData = sanificaTurno({ ...turnoDataRaw, orario: turnoDataRaw.orario || { inizio: shiftStart, fine: shiftEnd } });
                 const eq = { ...turnoData.equipaggio_attuale };
                 
-                if (eq[ruolo] && eq[ruolo].matricola) {
-                    throw "Lo slot richiesto è stato appena occupato da un altro utente.";
+                const ruoloArr = eq[ruolo] || [];
+                const checkOverlap = calcolaCoperturaRuolo([...ruoloArr, { inizio: userInizio, fine: userFine }], shiftStart, shiftEnd);
+                if (checkOverlap.overlaps) {
+                    throw "Sovrapposizione di orari per lo stesso ruolo!";
                 }
 
                 const nuovoMembro = {
                     matricola: currentUser.matricola,
                     nominativo: formattaNominativoUtente(currentUser),
-                    convalidato_da_admin: false
+                    inizio: userInizio,
+                    fine: userFine,
+                    convalidato_da_admin: false,
+                    is_dipendente: !!currentUser.is_dipendente
                 };
 
-                if (ruolo === 'autista') eq.autista = nuovoMembro;
-                if (ruolo === 'referente_soreu') eq.referente_soreu = nuovoMembro;
-                if (ruolo === 'soccorritore') eq.soccorritore = nuovoMembro;
-                if (ruolo === 'allievo_quarto_posto') eq.allievo_quarto_posto = nuovoMembro;
+                eq[ruolo] = [...ruoloArr, nuovoMembro];
 
                 const logs = turnoData.log_modifiche || [];
                 logs.push({
                     timestamp: new Date().toISOString(),
                     autore: currentUser.matricola,
-                    azione: `Iscrizione autonoma come ${ruolo.replace(/_/g, ' ')}`,
+                    azione: `Iscrizione autonoma come ${ruolo.replace(/_/g, ' ')} (${userInizio}-${userFine})`,
                     notifica_inviata: false
                 });
 
@@ -665,6 +761,55 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Errore iscrizione:", err);
             alert(typeof err === "string" ? err : "Si è verificato un errore di rete durante l'iscrizione.");
         }
+      };
+
+      const modificaOrarioFine = async (idTurno, ruolo, orarioFineAttuale) => {
+          const userFine = prompt("A che ora finisci?", orarioFineAttuale);
+          if (!userFine || userFine === orarioFineAttuale) return;
+
+          console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Modifica orario fine a ${idTurno} ruolo ${ruolo} per ${userFine}`);
+
+          try {
+              const docRef = doc(db, "turni", idTurno);
+              
+              await runTransaction(db, async (transaction) => {
+                  const turnoSnap = await transaction.get(docRef);
+                  if (!turnoSnap.exists()) throw "Il turno non esiste più nel database.";
+                  
+                  const turnoDataRaw = turnoSnap.data();
+                  const turnoData = sanificaTurno({ ...turnoDataRaw, orario: turnoDataRaw.orario || { inizio: "00:00", fine: "00:00" } });
+                  const eq = { ...turnoData.equipaggio_attuale };
+                  
+                  if (eq[ruolo]) {
+                      const myIndex = eq[ruolo].findIndex(a => String(a.matricola) === String(currentUser.matricola));
+                      if (myIndex !== -1) {
+                          eq[ruolo][myIndex].fine = userFine;
+                      } else {
+                          throw "Non sei iscritto a questo turno.";
+                      }
+                  } else {
+                      throw "Non sei iscritto a questo turno.";
+                  }
+
+                  const logs = turnoData.log_modifiche || [];
+                  logs.push({
+                      timestamp: new Date().toISOString(),
+                      autore: currentUser.matricola,
+                      azione: `Modifica orario fine per slot ${ruolo.replace(/_/g, ' ')} a ${userFine}`,
+                      notifica_inviata: false
+                  });
+
+                  transaction.update(docRef, {
+                      equipaggio_attuale: eq,
+                      log_modifiche: logs
+                  });
+              });
+
+              console.log(`[DEBUG_DB] CONFERMA_FIRESTORE: Modifica orario confermata da DB`);
+          } catch (err) {
+              console.error("Errore modifica orario:", err);
+              alert(typeof err === "string" ? err : "Si è verificato un errore di rete durante la modifica.");
+          }
       };
   }
 });

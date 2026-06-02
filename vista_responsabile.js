@@ -13,8 +13,7 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, getDocs, updateDoc, doc, onSnapshot, query, writeBatch, getDoc, runTransaction, setDoc, deleteDoc } from "firebase/firestore";
-import { formattaNominativoUtente, ordinaUtentiAlfabetico, formattaNomeDisplay, sanificaTurno } from './utils.js';
-
+import { formattaNominativoUtente, ordinaUtentiAlfabetico, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo, calcolaBuchiRuolo } from './utils.js';
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
   authDomain: "turni-sda.firebaseapp.com",
@@ -321,18 +320,27 @@ document.addEventListener('DOMContentLoaded', () => {
           const eq = turno.equipaggio_attuale || {};
           const req = turno.requisiti_equipaggio || {};
           
-          const formatCell = (membro, richiesto, roleKey) => {
-              if (membro?.matricola) {
-                  const nomeDisplay = formattaNomeDisplay(membro.nominativo);
-                  const nameColor = membro.convalidato_da_admin ? '#32CD32' : '#FFD700';
-                  
-                  const isAdmin = currentAdminUser?.ruolo === 'admin' || currentAdminUser?.ruolo === 'superadmin' || currentAdminUser?.is_admin === true || currentAdminUser?.superadmin === true;
-                  const btnRemoveHtml = isAdmin ? `<button class="admin-remove-vol" data-turno="${turno.id}" data-ruolo="${roleKey}" title="Rimuovi Volontario" style="background:transparent; border:none; cursor:pointer; margin-left:0.3rem; color:var(--neon-red); font-size:1rem; padding:0;">❌</button>` : '';
-                  const btnSposHtml = isAdmin && !spostamentoAttivoGlobale ? `<button class="admin-sposta-vol" data-turno="${turno.id}" data-ruolo="${roleKey}" title="Sposta Volontario" style="background:transparent; border:none; cursor:pointer; margin-left:0.3rem; color:var(--neon-orange); font-size:1rem; padding:0;">🔄</button>` : '';
+          const formatCell = (assegnazioni, richiesto, roleKey) => {
+              if (assegnazioni && assegnazioni.length > 0) {
+                  let html = '';
+                  assegnazioni.forEach((membro) => {
+                      const nomeDisplay = formattaNomeDisplay(membro.nominativo);
+                      const nameColor = membro.convalidato_da_admin ? '#32CD32' : '#FFD700';
+                      
+                      const isAdmin = currentAdminUser?.ruolo === 'admin' || currentAdminUser?.ruolo === 'superadmin' || currentAdminUser?.is_admin === true || currentAdminUser?.superadmin === true;
+                      const btnRemoveHtml = isAdmin ? `<button class="admin-remove-vol" data-turno="${turno.id}" data-ruolo="${roleKey}" data-matricola="${membro.matricola}" title="Rimuovi Volontario" style="background:transparent; border:none; cursor:pointer; margin-left:0.3rem; color:var(--neon-red); font-size:1rem; padding:0;">❌</button>` : '';
+                      const btnSposHtml = isAdmin && !spostamentoAttivoGlobale ? `<button class="admin-sposta-vol" data-turno="${turno.id}" data-ruolo="${roleKey}" data-matricola="${membro.matricola}" title="Sposta Volontario" style="background:transparent; border:none; cursor:pointer; margin-left:0.3rem; color:var(--neon-orange); font-size:1rem; padding:0;">🔄</button>` : '';
 
-                  return membro.convalidato_da_admin 
-                      ? `<span style="color:${nameColor}; font-weight:bold;">${nomeDisplay}</span>${btnRemoveHtml}${btnSposHtml}<br><span style="font-size:0.6rem; color:var(--neon-green);">✓ Conv.</span>`
-                      : `<span style="color:${nameColor}; font-weight:bold;">${nomeDisplay}</span>${btnRemoveHtml}${btnSposHtml}<br><span style="font-size:0.6rem; color:#38bdf8;">⚠ Attesa</span>`;
+                      const statusHtml = membro.convalidato_da_admin 
+                          ? `<span style="font-size:0.6rem; color:var(--neon-green);">✓ Conv.</span>`
+                          : `<span style="font-size:0.6rem; color:#38bdf8;">⚠ Attesa</span>`;
+                          
+                      html += `<div style="margin-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.2rem;">
+                          <span style="color:${nameColor}; font-weight:bold;">${nomeDisplay}</span>${btnRemoveHtml}${btnSposHtml}<br>
+                          <span style="font-size:0.75rem; color:var(--text-muted);">${membro.inizio}-${membro.fine}</span> ${statusHtml}
+                      </div>`;
+                  });
+                  return html;
               }
               if (!richiesto) return `<em style="color:var(--text-muted); font-size: 0.85rem; opacity: 0.5;">N.D.</em>`;
               
@@ -342,22 +350,21 @@ document.addEventListener('DOMContentLoaded', () => {
               return `<em style="color:var(--neon-red); font-size: 0.85rem;">Vuoto</em>${btnDestHtml}`;
           };
 
-          let badgeClass = 'incompleto';
           let stato = turno.stato_turno || 'APERTO';
+          const inizioTurno = turno.orario?.inizio || "00:00";
+          const fineTurno = turno.orario?.fine || "00:00";
           
-          const mancanteAutista = req.autista_richiesto && !eq.autista?.matricola;
-          const mancanteReferente = req.referente_richiesto && !eq.referente_soreu?.matricola;
-          const mancanteSoccorritore = req.soccorritore_richiesto && !eq.soccorritore?.matricola;
+          const autistaFull = !req.autista_richiesto || calcolaCoperturaRuolo(eq.autista, inizioTurno, fineTurno).isFull;
+          const referenteFull = !req.referente_richiesto || calcolaCoperturaRuolo(eq.referente_soreu, inizioTurno, fineTurno).isFull;
+          const soccorritoreFull = !req.soccorritore_richiesto || calcolaCoperturaRuolo(eq.soccorritore, inizioTurno, fineTurno).isFull;
           
-          if (mancanteAutista || mancanteReferente || mancanteSoccorritore) { 
-            badgeClass = 'critico'; 
+          if (!autistaFull || !referenteFull || !soccorritoreFull) { 
             stato = 'INCOMPLETO'; 
           }
-          else if (stato === 'CONVALIDATO') badgeClass = 'convalidato';
-          else if (stato === 'COMPLETO' || (!mancanteAutista && !mancanteReferente && !mancanteSoccorritore)) { 
-            badgeClass = 'pieno'; 
+          else if (stato !== 'CONVALIDATO') { 
             stato = 'COMPLETO'; 
           }
+          let badgeClass = (stato === 'COMPLETO' || stato === 'CONVALIDATO') ? 'pieno' : 'critico';
 
           const dateObj = new Date(turno.data);
           const fDate = dateObj.toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit' });
@@ -416,7 +423,8 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', async (e) => {
                 const idTurno = e.currentTarget.getAttribute('data-turno');
                 const ruolo = e.currentTarget.getAttribute('data-ruolo');
-                await rimuoviVolontarioImprevisto(idTurno, ruolo);
+                const matricola = e.currentTarget.getAttribute('data-matricola');
+                await rimuoviVolontarioImprevisto(idTurno, ruolo, matricola);
             });
         });
 
@@ -424,7 +432,8 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.addEventListener('click', async (e) => {
                 const idTurno = e.currentTarget.getAttribute('data-turno');
                 const ruolo = e.currentTarget.getAttribute('data-ruolo');
-                await gestisciClickSpostamento(idTurno, ruolo);
+                const matricola = e.currentTarget.getAttribute('data-matricola');
+                await gestisciClickSpostamento(idTurno, ruolo, matricola);
             });
         });
 
@@ -439,7 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
         attachActionListeners();
       };
 
-      const rimuoviVolontarioImprevisto = async (idTurno, ruolo) => {
+      const rimuoviVolontarioImprevisto = async (idTurno, ruolo, matricola) => {
         if(!confirm("Sei sicuro di voler rimuovere il volontario dal turno?")) return;
         
         console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Rimozione imprevista da ${idTurno} ruolo ${ruolo}`);
@@ -451,13 +460,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const turnoSnap = await transaction.get(docRef);
                 if (!turnoSnap.exists()) throw "Il turno non esiste più nel database.";
                 
-                const turnoData = turnoSnap.data();
+                const turnoDataRaw = turnoSnap.data();
+                const turnoData = sanificaTurno({ ...turnoDataRaw, orario: turnoDataRaw.orario || { inizio: "00:00", fine: "00:00" } });
                 const eq = { ...turnoData.equipaggio_attuale };
                 
-                if (ruolo === 'autista') eq.autista = { matricola: null, nominativo: null, convalidato_da_admin: false };
-                if (ruolo === 'referente_soreu') eq.referente_soreu = { matricola: null, nominativo: null, convalidato_da_admin: false };
-                if (ruolo === 'soccorritore') eq.soccorritore = { matricola: null, nominativo: null, convalidato_da_admin: false };
-                if (ruolo === 'allievo_quarto_posto') eq.allievo_quarto_posto = { matricola: null, nominativo: null, convalidato_da_admin: false };
+                if (eq[ruolo]) {
+                    eq[ruolo] = eq[ruolo].filter(a => a.matricola !== matricola);
+                }
 
                 const logs = turnoData.log_modifiche || [];
                 logs.push({
@@ -505,7 +514,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Imposta convalidato_da_admin = true a tutti
                 const validatedEq = { ...currentEq };
                 ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(r => {
-                    if (validatedEq[r]?.matricola) validatedEq[r].convalidato_da_admin = true;
+                    if (validatedEq[r]) {
+                        validatedEq[r] = validatedEq[r].map(a => ({ ...a, convalidato_da_admin: true }));
+                    }
                 });
                 nuovoStatoTurno = 'CONVALIDATO';
                 payloadModifica = { nuovoEquipaggio: validatedEq, nuovoStato: nuovoStatoTurno };
@@ -616,11 +627,11 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('btn-save').addEventListener('click', confermaEInviaNotifiche);
       
       // LOGICA SPOSTAMENTO STATE-DRIVEN
-      const gestisciClickSpostamento = async (idTurno, ruolo) => {
+      const gestisciClickSpostamento = async (idTurno, ruolo, matricola) => {
           const turnoObj = turniOriginali.get(idTurno);
           if (!turnoObj) return;
-          const vol = turnoObj.equipaggio_attuale?.[ruolo];
-          if (!vol?.matricola) return;
+          const vol = turnoObj.equipaggio_attuale?.[ruolo]?.find(a => a.matricola === matricola);
+          if (!vol) return;
 
           try {
               const docRef = doc(db, "spostamenti_attivi", currentAdminUser.matricola);
@@ -660,29 +671,29 @@ document.addEventListener('DOMContentLoaded', () => {
                   const destSnap = (spostamentoAttivoGlobale.sourceTurnoId === idTurnoDest) ? sourceSnap : await transaction.get(destRef);
                   if (!destSnap.exists()) throw "Il turno di destinazione non esiste più.";
                   
-                  const sourceData = sourceSnap.data();
-                  const destData = destSnap.data();
+                  const sourceDataRaw = sourceSnap.data();
+                  const destDataRaw = destSnap.data();
+                  const sourceData = sanificaTurno({ ...sourceDataRaw, orario: sourceDataRaw.orario || { inizio: "00:00", fine: "00:00" } });
+                  const destData = sanificaTurno({ ...destDataRaw, orario: destDataRaw.orario || { inizio: "00:00", fine: "00:00" } });
                   
                   const sourceEq = sourceData.equipaggio_attuale || {};
                   const destEq = destData.equipaggio_attuale || {};
                   
-                  if (sourceEq[spostamentoAttivoGlobale.sourceRoleKey]?.matricola !== spostamentoAttivoGlobale.volunteer.matricola) {
+                  if (!sourceEq[spostamentoAttivoGlobale.sourceRoleKey] || !sourceEq[spostamentoAttivoGlobale.sourceRoleKey].some(a => a.matricola === spostamentoAttivoGlobale.volunteer.matricola)) {
                       throw "ERRORE_ORIGINE";
                   }
                   
-                  if (destEq[ruoloDest]?.matricola) {
-                      throw "SLOT_OCCUPATO";
-                  }
+                  // Avoid overlap check for now during manual move, just append
                   
                   const newSourceEq = { ...sourceEq };
-                  newSourceEq[spostamentoAttivoGlobale.sourceRoleKey] = { matricola: null, nominativo: null, convalidato_da_admin: false };
+                  newSourceEq[spostamentoAttivoGlobale.sourceRoleKey] = newSourceEq[spostamentoAttivoGlobale.sourceRoleKey].filter(a => a.matricola !== spostamentoAttivoGlobale.volunteer.matricola);
                   
                   const newDestEq = (spostamentoAttivoGlobale.sourceTurnoId === idTurnoDest) ? newSourceEq : { ...destEq };
-                  newDestEq[ruoloDest] = {
-                      matricola: spostamentoAttivoGlobale.volunteer.matricola,
-                      nominativo: spostamentoAttivoGlobale.volunteer.nominativo,
+                  const destRuolo = newDestEq[ruoloDest] || [];
+                  newDestEq[ruoloDest] = [...destRuolo, {
+                      ...spostamentoAttivoGlobale.volunteer,
                       convalidato_da_admin: true
-                  };
+                  }];
                   
                   const sourceLogs = sourceData.log_modifiche || [];
                   sourceLogs.push({
@@ -787,12 +798,42 @@ document.addEventListener('DOMContentLoaded', () => {
     modalRoleSelect.innerHTML = '';
     const req = turnoObj.requisiti_equipaggio || {};
     const eq = turnoObj.equipaggio_attuale || {};
+    const inizioTurno = turnoObj.orario?.inizio || "00:00";
+    const fineTurno = turnoObj.orario?.fine || "00:00";
     
     const options = [];
-    if (req.autista_richiesto) options.push({val: 'AUT', label: 'Autista', field: 'autista', occ: eq.autista?.matricola});
-    if (req.referente_richiesto) options.push({val: 'RIF', label: 'Referente SOREU', field: 'referente_soreu', occ: eq.referente_soreu?.matricola});
-    if (req.soccorritore_richiesto) options.push({val: 'SOC', label: 'Operatore DAE', field: 'soccorritore', occ: eq.soccorritore?.matricola});
-    if (req.allievo_consentito) options.push({val: 'ALL', label: 'Allievo', field: 'allievo_quarto_posto', occ: eq.allievo_quarto_posto?.matricola});
+    
+    const addRoleOptions = (reqFlag, field, label) => {
+        if (!reqFlag) return;
+        const slots = eq[field] || [];
+        const buchi = calcolaBuchiRuolo(slots, inizioTurno, fineTurno);
+        if (buchi.length > 0) {
+            buchi.forEach((buco, idx) => {
+                options.push({
+                    val: field + '_' + idx,
+                    label: `${label} (Gap: ${buco.inizio}-${buco.fine})`,
+                    field: field,
+                    inizio: buco.inizio,
+                    fine: buco.fine,
+                    occ: false
+                });
+            });
+        } else {
+            options.push({
+                val: field + '_full',
+                label: `${label} (Completo)`,
+                field: field,
+                inizio: inizioTurno,
+                fine: fineTurno,
+                occ: true
+            });
+        }
+    };
+
+    addRoleOptions(req.autista_richiesto, 'autista', 'Autista');
+    addRoleOptions(req.referente_richiesto, 'referente_soreu', 'Referente SOREU');
+    addRoleOptions(req.soccorritore_richiesto, 'soccorritore', 'Operatore DAE');
+    addRoleOptions(req.allievo_consentito, 'allievo_quarto_posto', 'Allievo');
     
     if(options.length === 0) {
       alert("Questo turno non ha requisiti configurati.");
@@ -800,8 +841,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     options.forEach(opt => {
-      const status = opt.occ ? '(Occupato)' : '(Libero)';
-      modalRoleSelect.innerHTML += `<option value="${opt.val}" data-field="${opt.field}">${opt.label} ${status}</option>`;
+      const status = opt.occ ? '(Occupato - Aggiungi Cmq)' : '(Libero)';
+      modalRoleSelect.innerHTML += `<option value="${opt.val}" data-field="${opt.field}" data-inizio="${opt.inizio}" data-fine="${opt.fine}">${opt.label} ${status}</option>`;
     });
     
     const updateModalTitle = () => {
@@ -929,10 +970,12 @@ document.addEventListener('DOMContentLoaded', () => {
   async function selectVolunteerForSlot(user) {
     const selectedOption = modalRoleSelect.options[modalRoleSelect.selectedIndex];
     const field = selectedOption.getAttribute('data-field');
-    const isOccupied = selectedOption.text.includes('(Occupato)');
+    const startGap = selectedOption.getAttribute('data-inizio');
+    const endGap = selectedOption.getAttribute('data-fine');
+    const isOccupied = selectedOption.text.includes('(Occupato');
     
     if (isOccupied) {
-      if (!confirm("Questo slot è già occupato. Sovrascrivere il volontario attuale?")) return;
+      if (!confirm("Questo ruolo è già completamente coperto. Vuoi comunque aggiungere questo volontario?")) return;
     }
 
     console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Inserimento da modale per ${modalTurnoId} ruolo ${field}`);
@@ -948,20 +991,25 @@ document.addEventListener('DOMContentLoaded', () => {
               throw "Il turno non esiste più.";
           }
           
-          const turnoData = turnoSnap.data();
+          const turnoDataRaw = turnoSnap.data();
+          const turnoData = sanificaTurno({ ...turnoDataRaw, orario: turnoDataRaw.orario || { inizio: "00:00", fine: "00:00" } });
           const currentEq = turnoData.equipaggio_attuale || {};
           
           // Se stavamo inserendo in uno slot originariamente libero, ma ora è occupato, blocchiamo
-          if (!isOccupied && currentEq[field]?.matricola) {
-              throw "SLOT_OCCUPATO";
-          }
+          // Nota: potremmo usare calcolaCoperturaRuolo per essere più precisi, ma in caso di array accodiamo
+          const fieldArray = Array.isArray(currentEq[field]) ? currentEq[field] : Object.values(currentEq[field] || {});
           
           const newEq = { ...currentEq };
-          newEq[field] = {
-              matricola: user.matricola,
-              nominativo: user.nominativo || formattaNominativoUtente(user),
-              convalidato_da_admin: true
-          };
+          newEq[field] = [
+              ...fieldArray,
+              {
+                  matricola: user.matricola,
+                  nominativo: user.nominativo || formattaNominativoUtente(user),
+                  inizio: startGap,
+                  fine: endGap,
+                  convalidato_da_admin: true
+              }
+          ];
           
           console.log(`[DEBUG_DB] DATA_INVIO: Transazione modale pronta`);
           transaction.update(turnoRef, { equipaggio_attuale: newEq });
