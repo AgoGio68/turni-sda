@@ -435,14 +435,21 @@ document.addEventListener('DOMContentLoaded', () => {
                       const nomeDisplay = formattaNomeDisplay(membro.nominativo);
                       
                       let badgeTag = '<span style="font-weight: bold; font-size: 0.8rem; color: #ffcc00;">[?]</span>';
-                      if (window.globalUsersMap && window.globalUsersMap[membro.matricola]) {
-                          const userObj = window.globalUsersMap[membro.matricola];
-                          const rapporto = userObj.tipoRapporto || userObj.rapporto || '';
-                          const rLower = rapporto.toLowerCase();
-                          if (rLower.includes('volontario')) {
-                              badgeTag = '<span style="color: #00f2fe; font-weight: bold; font-size: 0.8rem;">[V]</span>';
-                          } else if (rLower.includes('dipendente')) {
-                              badgeTag = '<span style="color: #ff007f; font-weight: bold; font-size: 0.8rem;">[D]</span>';
+                      if (window.globalUsersMap) {
+                          const mStr = String(membro.matricola);
+                          // Try exact match first, then zero-padded/stripped variants
+                          const userObj = window.globalUsersMap[mStr]
+                              || window.globalUsersMap[parseInt(mStr, 10)]
+                              || window.globalUsersMap[mStr.replace(/^0+/, '')]
+                              || window.globalUsersMap[mStr.padStart(3, '0')]
+                              || null;
+                          if (userObj) {
+                              const rapporto = (userObj.tipoRapporto || userObj.rapporto || '').toLowerCase();
+                              if (rapporto.includes('volontario')) {
+                                  badgeTag = '<span style="color: #00f2fe; font-weight: bold; font-size: 0.8rem;">[V]</span>';
+                              } else if (rapporto.includes('dipendente')) {
+                                  badgeTag = '<span style="color: #ff007f; font-weight: bold; font-size: 0.8rem;">[D]</span>';
+                              }
                           }
                       }
                       
