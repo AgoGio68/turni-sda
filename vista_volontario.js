@@ -11,7 +11,7 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 */
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, query, onSnapshot, doc, getDoc, runTransaction } from "firebase/firestore";
+import { getFirestore, collection, query, onSnapshot, doc, getDoc, getDocs, where, runTransaction } from "firebase/firestore";
 import { verificaIscrizione, validaRiposi } from './regole_iscrizione.js';
 import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo, calcolaBuchiRuolo } from './utils.js';
 
@@ -531,6 +531,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = turnoSnap.data();
             let equipaggio = data.equipaggio_attuale || {};
             
+            if (equipaggio[ruolo] && !Array.isArray(equipaggio[ruolo])) {
+                const vals = Object.values(equipaggio[ruolo]).filter(v => v && typeof v === 'object' && v.matricola);
+                equipaggio[ruolo] = vals;
+            }
             if (equipaggio[ruolo]) {
                 equipaggio[ruolo] = equipaggio[ruolo].filter(m => 
                     !(String(m.matricola) === String(currentUser.matricola) && m.inizio === inizioSelezionato)
@@ -547,31 +551,80 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // --- OBIETTIVO 2: Nuova funzione per assegnare un altro volontario per matricola ---
+  // --- OBIETTIVO 2: Assegnazione volontario per COGNOME (con fallback matricola) ---
   const assegnaVolontario = async (idTurno, ruolo, bucoInizio, bucoFine) => {
-    const matricolaInput = prompt(
-        `Assegna un volontario per coprire ${bucoInizio}-${bucoFine}.\nInserisci la Matricola del volontario:`
+    const inputRicerca = prompt(
+        `Assegna un volontario per coprire ${bucoInizio}-${bucoFine}.\nInserisci il Cognome del volontario da cercare:`
     );
-    if (!matricolaInput) return;
-    const matricola = matricolaInput.trim();
+    if (!inputRicerca) return;
+    const termineRicerca = inputRicerca.trim();
+    if (!termineRicerca) return;
 
-    // Lookup su Firestore per validare la matricola e recuperare nome/cognome
-    let utenteData;
+    let utenteData = null;
+    let matricola = null;
+
     try {
-        const utenteSnap = await getDoc(doc(db, "utenti", matricola));
-        if (!utenteSnap.exists()) {
-            alert(`Matricola "${matricola}" non trovata nel database.`);
-            return;
+        // Ricerca per cognome: proviamo diverse capitalizzazioni
+        const tentativi = [
+            termineRicerca,
+            termineRicerca.charAt(0).toUpperCase() + termineRicerca.slice(1).toLowerCase(),
+            termineRicerca.toUpperCase()
+        ];
+        // Rimuovi duplicati
+        const tentativiUnici = [...new Set(tentativi)];
+
+        let risultati = null;
+        for (const tentativo of tentativiUnici) {
+            const qCognome = query(collection(db, "utenti"), where("cognome", "==", tentativo));
+            const snap = await getDocs(qCognome);
+            if (snap.size > 0) {
+                risultati = snap;
+                break;
+            }
         }
-        utenteData = utenteSnap.data();
+
+        if (risultati && risultati.size === 1) {
+            // Match singolo: usa direttamente
+            matricola = risultati.docs[0].id;
+            utenteData = risultati.docs[0].data();
+        } else if (risultati && risultati.size > 1) {
+            // Match multiplo: chiedi all'utente di scegliere
+            let elenco = '';
+            risultati.docs.forEach((d, i) => {
+                const u = d.data();
+                elenco += `${i + 1}. ${u.cognome || ''} ${u.nome || ''} (Matr. ${d.id})\n`;
+            });
+            const scelta = prompt(
+                `Trovati ${risultati.size} volontari:\n${elenco}\nInserisci il numero corrispondente:`
+            );
+            if (!scelta) return;
+            const idx = parseInt(scelta) - 1;
+            if (idx >= 0 && idx < risultati.size) {
+                matricola = risultati.docs[idx].id;
+                utenteData = risultati.docs[idx].data();
+            } else {
+                alert('Selezione non valida.');
+                return;
+            }
+        } else {
+            // Fallback: prova come matricola diretta
+            const snapMatricola = await getDoc(doc(db, "utenti", termineRicerca));
+            if (snapMatricola.exists()) {
+                matricola = termineRicerca;
+                utenteData = snapMatricola.data();
+            } else {
+                alert(`Nessun volontario trovato per "${termineRicerca}".\nProva con il cognome esatto o la matricola.`);
+                return;
+            }
+        }
     } catch (e) {
-        console.error("Errore lookup matricola:", e);
-        alert("Errore durante la ricerca della matricola.");
+        console.error('Errore ricerca volontario:', e);
+        alert('Errore durante la ricerca del volontario.');
         return;
     }
 
     const nominativo = `${utenteData.cognome || ''} ${utenteData.nome || ''}`.trim() || 'Sconosciuto';
-    if (!confirm(`Confermi l'assegnazione di ${nominativo} (${matricola}) per ${bucoInizio}-${bucoFine}?`)) return;
+    if (!confirm(`Confermi l'assegnazione di ${nominativo} (Matr. ${matricola}) per ${bucoInizio}-${bucoFine}?`)) return;
 
     console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Assegnazione volontario ${matricola} a ${idTurno} ruolo ${ruolo} per ${bucoInizio}-${bucoFine}`);
     isUpdating = true;
@@ -582,7 +635,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const snap = await transaction.get(docRef);
             if (!snap.exists()) throw "Turno non trovato";
             let equipaggio = snap.data().equipaggio_attuale || {};
-            if (!equipaggio[ruolo]) equipaggio[ruolo] = [];
+            // Sicurezza: converti formati legacy in array
+            if (!equipaggio[ruolo] || !Array.isArray(equipaggio[ruolo])) {
+                const old = equipaggio[ruolo];
+                equipaggio[ruolo] = (old && typeof old === 'object') 
+                    ? Object.values(old).filter(v => v && typeof v === 'object' && v.matricola) 
+                    : [];
+            }
 
             equipaggio[ruolo].push({
                 matricola: matricola,
@@ -615,7 +674,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const turnoData = turnoSnap.data();
             let equipaggio = turnoData.equipaggio_attuale || {};
-            if (!equipaggio[ruolo]) equipaggio[ruolo] = [];
+            // Sicurezza: converti formati legacy in array
+            if (!equipaggio[ruolo] || !Array.isArray(equipaggio[ruolo])) {
+                const old = equipaggio[ruolo];
+                equipaggio[ruolo] = (old && typeof old === 'object') 
+                    ? Object.values(old).filter(v => v && typeof v === 'object' && v.matricola) 
+                    : [];
+            }
 
             // Orario pre-calcolato dal buco residuo, nessun prompt necessario
             const oraInizio = bucoInizio || turnoData.orario?.inizio || "08:00";
@@ -663,6 +728,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = snap.data();
             let equipaggio = data.equipaggio_attuale || {};
             
+            if (equipaggio[ruolo] && !Array.isArray(equipaggio[ruolo])) {
+                const vals = Object.values(equipaggio[ruolo]).filter(v => v && typeof v === 'object' && v.matricola);
+                equipaggio[ruolo] = vals;
+            }
             if (equipaggio[ruolo]) {
                 equipaggio[ruolo] = equipaggio[ruolo].map(m => {
                     if (String(m.matricola) === String(currentUser.matricola) && m.inizio === inizioSelezionato) {
