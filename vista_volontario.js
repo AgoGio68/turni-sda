@@ -46,12 +46,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let isUpdating = false;
   let utentiCache = null; // Cache lista volontari per il modal admin
   
-  let configLive = { controllaRiposoVolontari: true, controllaRiposoDipendenti: false };
+  let configLive = { controllaRiposoVolontari: true, controllaRiposoDipendenti: false, applicaRegoleAdmin: false };
   onSnapshot(doc(db, "impostazioni", "regole_riposo"), (snap) => {
       if (snap.exists()) {
           const data = snap.data();
           configLive.controllaRiposoVolontari = !!data.controllaRiposoVolontari;
           configLive.controllaRiposoDipendenti = !!data.controllaRiposoDipendenti;
+          configLive.applicaRegoleAdmin = !!data.applicaRegoleAdmin;
       }
   });
 
@@ -162,7 +163,9 @@ document.addEventListener('DOMContentLoaded', () => {
                   riposoCheck = validaRiposi(turno.data, bucoInizio, bucoFine, turniVolontario);
               }
           }
-          if (isRuleActive && !riposoCheck.idoneo) return;
+          // If admin bypass is OFF, skip the rest check for admins
+          const isAdminUser = currentUser && (currentUser.ruolo === 'admin' || currentUser.ruolo === 'superadmin' || currentUser.is_admin === true);
+          if (isRuleActive && !riposoCheck.idoneo && (!isAdminUser || configLive.applicaRegoleAdmin)) return;
 
           foundVolunteers++;
           const nome = `${(u.cognome || '').trim()} ${(u.nome || '').trim()}`.trim();
@@ -640,9 +643,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (giaNelTurno && !iAmInThisRole) {
                 btnStr = '<span style="font-size:0.75rem; color:var(--neon-green)">Sei in un altro ruolo</span>';
-            } else if (isAdmin || (giaNelTurno && iAmInThisRole)) {
-                // Admin o già nel ruolo → Assegna un altro volontario per matricola
+            } else if (isAdmin && !configLive.applicaRegoleAdmin) {
+                // Admin con bypass attivo → Assegna sempre, ignora regola riposo
                 btnStr = `<button class="btn btn-assign-vol" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-buco-inizio="${buco.inizio}" data-buco-fine="${buco.fine}">👤 Assegna Volontario</button>`;
+            } else if (isAdmin && configLive.applicaRegoleAdmin) {
+                // Admin con regola applicata → mostra assegna + avviso se violazione
+                const avviso = (isRuleActive && !riposoCheck.idoneo) ? ' <span style="font-size:0.65rem; color:var(--neon-red);">⚠️ Riposo</span>' : '';
+                btnStr = `<button class="btn btn-assign-vol" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-buco-inizio="${buco.inizio}" data-buco-fine="${buco.fine}">👤 Assegna Volontario</button>${avviso}`;
             } else if (isKioskMode) {
                 btnStr = '';
             } else if (isRuleActive && !riposoCheck.idoneo && !iAmInThisRole) {
@@ -653,6 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Volontario standard idoneo → Prendi Turno con orario pre-calcolato
                 btnStr = `<button class="btn btn-take" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-buco-inizio="${buco.inizio}" data-buco-fine="${buco.fine}">Prendi Turno (${bucoLabel})</button>`;
             }
+
 
             html += `
                 <div class="slot-row">

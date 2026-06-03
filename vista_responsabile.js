@@ -307,9 +307,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         <label style="color: #fff;">Blocco 11h VOLONTARI</label>
                         <input type="checkbox" id="toggle-riposo-volontari" style="transform: scale(1.2); cursor: pointer;">
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <label style="color: #fff;">Blocco 11h DIPENDENTI</label>
                         <input type="checkbox" id="toggle-riposo-dipendenti" style="transform: scale(1.2); cursor: pointer;">
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; margin-top: 4px;">
+                        <label style="color: #ffcc00; font-size: 0.9rem;">⚠️ Applica regola anche agli Admin</label>
+                        <input type="checkbox" id="toggle-regola-admin" style="transform: scale(1.2); cursor: pointer;">
                     </div>
                 </div>
               `;
@@ -318,19 +322,22 @@ document.addEventListener('DOMContentLoaded', () => {
           // Bind to Firestore live listener AFTER innerHTML has been written (elements now exist in DOM)
           const toggleVolontari = document.getElementById('toggle-riposo-volontari');
           const toggleDipendenti = document.getElementById('toggle-riposo-dipendenti');
+          const toggleRegoleAdmin = document.getElementById('toggle-regola-admin');
 
-          if (toggleVolontari && toggleDipendenti) {
+          if (toggleVolontari && toggleDipendenti && toggleRegoleAdmin) {
               if (activeUnsubscribes.regole_riposo) activeUnsubscribes.regole_riposo();
               activeUnsubscribes.regole_riposo = onSnapshot(doc(db, "impostazioni", "regole_riposo"), async (snap) => {
                   if (snap.exists()) {
                       const data = snap.data();
                       toggleVolontari.checked = !!data.controllaRiposoVolontari;
                       toggleDipendenti.checked = !!data.controllaRiposoDipendenti;
+                      toggleRegoleAdmin.checked = !!data.applicaRegoleAdmin;
                   } else {
                       // Document doesn't exist yet — initialize with safe defaults
                       await setDoc(doc(db, "impostazioni", "regole_riposo"), {
                           controllaRiposoVolontari: true,
-                          controllaRiposoDipendenti: false
+                          controllaRiposoDipendenti: false,
+                          applicaRegoleAdmin: false
                       });
                   }
               });
@@ -339,7 +346,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   try {
                       await updateDoc(doc(db, "impostazioni", "regole_riposo"), {
                           controllaRiposoVolontari: toggleVolontari.checked,
-                          controllaRiposoDipendenti: toggleDipendenti.checked
+                          controllaRiposoDipendenti: toggleDipendenti.checked,
+                          applicaRegoleAdmin: toggleRegoleAdmin.checked
                       });
                   } catch(e) {
                       console.error("Errore update regole riposo", e);
@@ -349,6 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
               toggleVolontari.addEventListener('change', updateRules);
               toggleDipendenti.addEventListener('change', updateRules);
+              toggleRegoleAdmin.addEventListener('change', updateRules);
           } else {
               console.warn("[SUPERADMIN] Toggle elements not found after innerHTML inject. Check #superadmin-rules-panel.");
           }
