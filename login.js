@@ -33,14 +33,7 @@ try {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Safe version injection
-  const APP_VERSION = "1.7.4";
-  const versionEl = document.getElementById('app-version-label');
-  if (versionEl) {
-      versionEl.textContent = `v${APP_VERSION}`; 
-  } else {
-      console.warn("Element 'app-version-label' not found in the current DOM layout.");
-  }
+
 
   const btnLogin = document.getElementById('btn-login');
   const errorMsg = document.getElementById('login-error');

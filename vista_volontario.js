@@ -34,7 +34,7 @@ try {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log("Vista Volontario - Ver. 1.7.4");
+
   // =====================================================
   //  STATO GLOBALE SOTTO UN UNICO SCOPE CHIUSO
   // =====================================================
