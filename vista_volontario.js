@@ -11,7 +11,7 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 */
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, query, onSnapshot, doc, getDoc, getDocs, where, runTransaction } from "firebase/firestore";
+import { getFirestore, collection, query, onSnapshot, doc, getDoc, getDocs, runTransaction } from "firebase/firestore";
 import { verificaIscrizione, validaRiposi } from './regole_iscrizione.js';
 import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo, calcolaBuchiRuolo } from './utils.js';
 
@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentUser = null;
   let activeUnsubscribeTurni = null;
   let isUpdating = false;
+  let utentiCache = null; // Cache lista volontari per il modal admin
 
   // Elementi DOM mappati singolarmente
   const userInfoDiv = document.getElementById('user-info');
@@ -54,6 +55,110 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnCloseDetails = document.getElementById('btn-close-details');
   const filterButtons = document.querySelectorAll('.filter-btn');
   const btnTv = document.getElementById('btn-tv-mode');
+
+  // Elementi DOM del modal picker volontario
+  const volPickerOverlay = document.getElementById('vol-picker-overlay');
+  const volPickerSearch = document.getElementById('vol-picker-search');
+  const volPickerList = document.getElementById('vol-picker-list');
+  const volPickerEmpty = document.getElementById('vol-picker-empty');
+  const volPickerSubtitle = document.getElementById('vol-picker-subtitle');
+  const volPickerClose = document.getElementById('vol-picker-close');
+
+  // =====================================================
+  //  MODAL PICKER VOLONTARIO — Logica apri/chiudi/cerca
+  // =====================================================
+  const closeVolPicker = () => {
+      volPickerOverlay.classList.remove('active');
+      volPickerSearch.value = '';
+  };
+  volPickerClose.addEventListener('click', closeVolPicker);
+  volPickerOverlay.addEventListener('click', (e) => {
+      if (e.target === volPickerOverlay) closeVolPicker();
+  });
+
+  // Filtra la lista in base al testo di ricerca
+  volPickerSearch.addEventListener('input', () => {
+      const q = volPickerSearch.value.trim().toLowerCase();
+      let found = 0;
+      volPickerList.querySelectorAll('.volunteer-item').forEach(el => {
+          const matches = el.dataset.searchKey.includes(q);
+          el.style.display = matches ? '' : 'none';
+          if (matches) found++;
+      });
+      volPickerEmpty.style.display = found === 0 ? 'block' : 'none';
+  });
+
+  // Apre il modal e ritorna una Promise che si risolve con { matricola, nominativo } o null
+  const apriVolPicker = async (bucoInizio, bucoFine) => {
+      // Carica utenti una sola volta e li mette in cache
+      if (!utentiCache) {
+          volPickerList.innerHTML = '<div style="text-align:center;padding:2rem;"><div class="spinner"></div><p style="color:var(--text-muted);font-size:0.85rem;">Caricamento volontari...</p></div>';
+          volPickerEmpty.style.display = 'none';
+          volPickerOverlay.classList.add('active');
+          try {
+              const snap = await getDocs(collection(db, 'utenti'));
+              utentiCache = snap.docs
+                  .map(d => ({ id: d.id, ...d.data() }))
+                  .filter(u => u.attivo !== false)
+                  .sort((a, b) => {
+                      const ca = (a.cognome || '').trim().toLowerCase();
+                      const cb = (b.cognome || '').trim().toLowerCase();
+                      return ca.localeCompare(cb, 'it');
+                  });
+          } catch (err) {
+              console.error('Errore caricamento utenti:', err);
+              volPickerList.innerHTML = '<p style="color:var(--neon-red);text-align:center;">Errore caricamento volontari.</p>';
+              return null;
+          }
+      } else {
+          volPickerOverlay.classList.add('active');
+      }
+
+      // Aggiorna subtitle con il buco orario
+      volPickerSubtitle.textContent = `Copertura richiesta: ${bucoInizio} - ${bucoFine}`;
+
+      // Renderizza la lista
+      volPickerList.innerHTML = '';
+      volPickerSearch.value = '';
+      volPickerEmpty.style.display = 'none';
+      utentiCache.forEach(u => {
+          const nome = `${(u.cognome || '').trim()} ${(u.nome || '').trim()}`.trim();
+          const mansione = u.mansione || u.ruoli_areu?.[0] || '';
+          const item = document.createElement('button');
+          item.className = 'volunteer-item';
+          item.dataset.searchKey = `${nome} ${u.id}`.toLowerCase();
+          item.innerHTML = `
+              <div>
+                  <div style="font-weight:700; font-size:0.9rem; color:var(--text-main);">${nome}</div>
+                  <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">${mansione} &nbsp;·&nbsp; Matr. ${u.id}</div>
+              </div>
+              <span style="font-size:0.75rem; color:var(--neon-green); font-weight:600;">✔ Seleziona</span>
+          `;
+          item.addEventListener('click', () => {
+              closeVolPicker();
+              // Risolvi la promise iniettando il risultato nel contesto chiamante
+              volPickerOverlay._resolve({ matricola: u.id, nominativo: nome });
+          });
+          volPickerList.appendChild(item);
+      });
+
+      volPickerSearch.focus();
+
+      // Ritorna una Promise che aspetta la selezione o la chiusura
+      return new Promise((resolve) => {
+          volPickerOverlay._resolve = resolve;
+          // Se l'utente chiude il modal senza selezionare
+          const onClose = () => {
+              volPickerClose.removeEventListener('click', onClose);
+              resolve(null);
+          };
+          // Aggiungi handler one-shot per la X (sovrascrive il closeVolPicker generico)
+          volPickerClose.addEventListener('click', onClose, { once: true });
+          volPickerOverlay.addEventListener('click', (e) => {
+              if (e.target === volPickerOverlay) resolve(null);
+          }, { once: true });
+      });
+  };
 
   // Rileva modalità Kiosk dall'URL
   const isKioskMode = new URLSearchParams(window.location.search).get('mode') === 'kiosk';
@@ -551,82 +656,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // --- OBIETTIVO 2: Assegnazione volontario per COGNOME (con fallback matricola) ---
+  // --- OBIETTIVO 2: Assegnazione volontario tramite MODAL con barra di ricerca ---
   const assegnaVolontario = async (idTurno, ruolo, bucoInizio, bucoFine) => {
-    const inputRicerca = prompt(
-        `Assegna un volontario per coprire ${bucoInizio}-${bucoFine}.\nInserisci il Cognome del volontario da cercare:`
-    );
-    if (!inputRicerca) return;
-    const termineRicerca = inputRicerca.trim();
-    if (!termineRicerca) return;
+    const selezione = await apriVolPicker(bucoInizio, bucoFine);
+    if (!selezione) return; // utente ha chiuso il modal
 
-    let utenteData = null;
-    let matricola = null;
-
-    try {
-        // Ricerca per cognome: proviamo diverse capitalizzazioni
-        const tentativi = [
-            termineRicerca,
-            termineRicerca.charAt(0).toUpperCase() + termineRicerca.slice(1).toLowerCase(),
-            termineRicerca.toUpperCase()
-        ];
-        // Rimuovi duplicati
-        const tentativiUnici = [...new Set(tentativi)];
-
-        let risultati = null;
-        for (const tentativo of tentativiUnici) {
-            const qCognome = query(collection(db, "utenti"), where("cognome", "==", tentativo));
-            const snap = await getDocs(qCognome);
-            if (snap.size > 0) {
-                risultati = snap;
-                break;
-            }
-        }
-
-        if (risultati && risultati.size === 1) {
-            // Match singolo: usa direttamente
-            matricola = risultati.docs[0].id;
-            utenteData = risultati.docs[0].data();
-        } else if (risultati && risultati.size > 1) {
-            // Match multiplo: chiedi all'utente di scegliere
-            let elenco = '';
-            risultati.docs.forEach((d, i) => {
-                const u = d.data();
-                elenco += `${i + 1}. ${u.cognome || ''} ${u.nome || ''} (Matr. ${d.id})\n`;
-            });
-            const scelta = prompt(
-                `Trovati ${risultati.size} volontari:\n${elenco}\nInserisci il numero corrispondente:`
-            );
-            if (!scelta) return;
-            const idx = parseInt(scelta) - 1;
-            if (idx >= 0 && idx < risultati.size) {
-                matricola = risultati.docs[idx].id;
-                utenteData = risultati.docs[idx].data();
-            } else {
-                alert('Selezione non valida.');
-                return;
-            }
-        } else {
-            // Fallback: prova come matricola diretta
-            const snapMatricola = await getDoc(doc(db, "utenti", termineRicerca));
-            if (snapMatricola.exists()) {
-                matricola = termineRicerca;
-                utenteData = snapMatricola.data();
-            } else {
-                alert(`Nessun volontario trovato per "${termineRicerca}".\nProva con il cognome esatto o la matricola.`);
-                return;
-            }
-        }
-    } catch (e) {
-        console.error('Errore ricerca volontario:', e);
-        alert('Errore durante la ricerca del volontario.');
-        return;
-    }
-
-    const nominativo = `${utenteData.cognome || ''} ${utenteData.nome || ''}`.trim() || 'Sconosciuto';
+    const { matricola, nominativo } = selezione;
     if (!confirm(`Confermi l'assegnazione di ${nominativo} (Matr. ${matricola}) per ${bucoInizio}-${bucoFine}?`)) return;
 
-    console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Assegnazione volontario ${matricola} a ${idTurno} ruolo ${ruolo} per ${bucoInizio}-${bucoFine}`);
+    console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Assegnazione ${matricola} a ${idTurno} ruolo ${ruolo} per ${bucoInizio}-${bucoFine}`);
     isUpdating = true;
 
     try {
@@ -642,17 +680,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? Object.values(old).filter(v => v && typeof v === 'object' && v.matricola) 
                     : [];
             }
-
             equipaggio[ruolo].push({
-                matricola: matricola,
-                nominativo: nominativo,
+                matricola,
+                nominativo,
                 inizio: bucoInizio,
                 fine: bucoFine,
                 convalidato_da_admin: false
             });
             transaction.update(docRef, { equipaggio_attuale: equipaggio });
         });
-        console.log("[DEBUG_DB] CONFERMA_FIRESTORE: Assegnazione volontario confermata da DB");
+        console.log("[DEBUG_DB] CONFERMA_FIRESTORE: Assegnazione confermata da DB");
     } catch (e) {
         console.error("Errore assegnazione volontario:", e);
         alert("Errore nell'assegnazione: " + e);
@@ -663,7 +700,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const iscriviti = async (idTurno, ruolo, bucoInizio, bucoFine) => {
-    console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Iscrizione a ${idTurno} ruolo ${ruolo} orario ${bucoInizio}-${bucoFine}`);
+    // L'utente è già identificato: auto-iscrizione diretta senza prompt
+    console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Auto-iscrizione a ${idTurno} ruolo ${ruolo} orario ${bucoInizio}-${bucoFine}`);
     isUpdating = true;
 
     try {
@@ -677,30 +715,31 @@ document.addEventListener('DOMContentLoaded', () => {
             // Sicurezza: converti formati legacy in array
             if (!equipaggio[ruolo] || !Array.isArray(equipaggio[ruolo])) {
                 const old = equipaggio[ruolo];
-                equipaggio[ruolo] = (old && typeof old === 'object') 
-                    ? Object.values(old).filter(v => v && typeof v === 'object' && v.matricola) 
+                equipaggio[ruolo] = (old && typeof old === 'object')
+                    ? Object.values(old).filter(v => v && typeof v === 'object' && v.matricola)
                     : [];
             }
 
-            // Orario pre-calcolato dal buco residuo, nessun prompt necessario
+            // Orario pre-calcolato dal buco residuo
             const oraInizio = bucoInizio || turnoData.orario?.inizio || "08:00";
-            const oraFine = bucoFine || turnoData.orario?.fine || "14:00";
+            const oraFine   = bucoFine   || turnoData.orario?.fine   || "14:00";
 
             const nuovoMembro = {
                 matricola: currentUser.matricola,
                 nominativo: `${currentUser.cognome} ${currentUser.nome}`,
                 inizio: oraInizio,
-                fine: oraFine,
+                fine:   oraFine,
                 convalidato_da_admin: false
             };
 
-            console.log("[DEBUG_DB] DATA_INVIO: Dati transazione calcolati per iscrizione", nuovoMembro);
+            console.log("[DEBUG_DB] DATA_INVIO:", nuovoMembro);
             equipaggio[ruolo].push(nuovoMembro);
             transaction.update(docRef, { equipaggio_attuale: equipaggio });
         });
         console.log("[DEBUG_DB] CONFERMA_FIRESTORE: Iscrizione confermata da DB");
     } catch (error) {
         console.error("Errore iscrizione:", error);
+        alert("Errore durante l'iscrizione: " + error);
     } finally {
         isUpdating = false;
         // Rendering delegato a onSnapshot per dati sempre freschi

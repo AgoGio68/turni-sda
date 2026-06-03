@@ -266,6 +266,36 @@
     </svg>
   </button>
 
-  <script type="module" src="vista_volontario.js?v=1.6.12"></script>
+
+  <!-- Modal Selezione Volontario (Admin) -->
+  <div class="modal-overlay" id="vol-picker-overlay">
+    <div class="modal-content glass-panel" style="width:min(480px,95vw); max-height:80vh; display:flex; flex-direction:column; padding:2rem; border-radius:var(--radius); box-shadow:0 0 40px rgba(57,255,20,0.15); border-color:rgba(57,255,20,0.25);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+        <div>
+          <h3 style="margin:0; font-size:1.1rem; color:var(--neon-green);">👤 Assegna Volontario</h3>
+          <p id="vol-picker-subtitle" style="margin:0.3rem 0 0 0; font-size:0.78rem; color:var(--text-muted);">Seleziona il volontario da assegnare</p>
+        </div>
+        <button id="vol-picker-close" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; font-size:1.4rem; padding:0.25rem 0.5rem;">✕</button>
+      </div>
+      <input
+        id="vol-picker-search"
+        type="text"
+        placeholder="🔍 Cerca per cognome o nome..."
+        autocomplete="off"
+        style="
+          width:100%; box-sizing:border-box; padding:0.7rem 1rem;
+          background:rgba(255,255,255,0.05); border:1px solid var(--border-glass);
+          border-radius:8px; color:var(--text-main); font-size:0.9rem;
+          outline:none; margin-bottom:1rem; transition:border-color 0.2s;
+        "
+      />
+      <div id="vol-picker-list" style="overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:0.5rem; padding-right:4px;">
+        <!-- Popolato via JS -->
+      </div>
+      <div id="vol-picker-empty" style="display:none; text-align:center; padding:2rem; color:var(--text-muted); font-size:0.85rem;">Nessun volontario trovato.</div>
+    </div>
+  </div>
+
+  <script type="module" src="vista_volontario.js?v=1.7.1"></script>
 </body>
 </html>
