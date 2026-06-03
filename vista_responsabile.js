@@ -287,6 +287,50 @@ document.addEventListener('DOMContentLoaded', () => {
       if (currentAdminUser && String(currentAdminUser.matricola).trim() === "34") {
           if (superadminPanel) {
               superadminPanel.style.display = 'block';
+              superadminPanel.innerHTML = `
+        <div style="padding: 20px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
+            <h3 style="color: #00f2fe; margin-top: 0; font-size: 1.1rem; text-transform: uppercase;">🛠️ Controllo Vincoli Orari 11h</h3>
+            
+            <!-- Volontari Switch -->
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <div>
+                    <label style="font-weight: 600; color: #fff; display: block;">Attiva blocco 11h VOLONTARI</label>
+                    <span style="font-size: 0.8rem; color: #888;">Forza il riposo di 11 ore per il personale volontario.</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-riposo-volontari">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <!-- Dipendenti Switch -->
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <label style="font-weight: 600; color: #fff; display: block;">Attiva blocco 11h DIPENDENTI</label>
+                    <span style="font-size: 0.8rem; color: #888;">Forza il riposo di 11 ore per il personale dipendente (attualmente flessibile).</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="toggle-riposo-dipendenti">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+              `;
+              
+              if (!document.getElementById('switch-styles-dynamic')) {
+                  const style = document.createElement('style');
+                  style.id = 'switch-styles-dynamic';
+                  style.innerHTML = `
+                    .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+                    .switch input { opacity: 0; width: 0; height: 0; }
+                    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 24px; }
+                    .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+                    input:checked + .slider { background-color: #00f2fe; }
+                    input:focus + .slider { box-shadow: 0 0 1px #00f2fe; }
+                    input:checked + .slider:before { transform: translateX(26px); }
+                  `;
+                  document.head.appendChild(style);
+              }
           }
           const toggleVolontari = document.getElementById('toggle-riposo-volontari');
           const toggleDipendenti = document.getElementById('toggle-riposo-dipendenti');
@@ -331,7 +375,16 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 3. Tabellone Turni Responsabile
+  window.globalUsersMap = {};
+  
   function initApp() {
+      if (activeUnsubscribes.utentiGlobal) activeUnsubscribes.utentiGlobal();
+      activeUnsubscribes.utentiGlobal = onSnapshot(collection(db, "utenti"), (snap) => {
+          snap.docs.forEach(d => {
+              window.globalUsersMap[d.id] = d.data();
+          });
+      });
+
       const q = query(collection(db, "turni")); 
       
       if (activeUnsubscribes.turni) activeUnsubscribes.turni();
@@ -393,6 +446,19 @@ document.addEventListener('DOMContentLoaded', () => {
                   let html = '';
                   assegnazioni.forEach((membro) => {
                       const nomeDisplay = formattaNomeDisplay(membro.nominativo);
+                      
+                      let badgeTag = '<span style="font-weight: bold; font-size: 0.8rem; color: #ffcc00;">[?]</span>';
+                      if (window.globalUsersMap && window.globalUsersMap[membro.matricola]) {
+                          const userObj = window.globalUsersMap[membro.matricola];
+                          const rapporto = userObj.tipoRapporto || userObj.rapporto || '';
+                          const rLower = rapporto.toLowerCase();
+                          if (rLower.includes('volontario')) {
+                              badgeTag = '<span style="color: #00f2fe; font-weight: bold; font-size: 0.8rem;">[V]</span>';
+                          } else if (rLower.includes('dipendente')) {
+                              badgeTag = '<span style="color: #ff007f; font-weight: bold; font-size: 0.8rem;">[D]</span>';
+                          }
+                      }
+                      
                       const nameColor = membro.convalidato_da_admin ? '#32CD32' : '#FFD700';
                       
                       const isAdmin = currentAdminUser?.ruolo === 'admin' || currentAdminUser?.ruolo === 'superadmin' || currentAdminUser?.is_admin === true || currentAdminUser?.superadmin === true;
@@ -404,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
                           : `<span style="font-size:0.6rem; color:#38bdf8;">⚠ Attesa</span>`;
                           
                       html += `<div style="margin-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.2rem;">
-                          <span style="color:${nameColor}; font-weight:bold;">${nomeDisplay}</span>${btnRemoveHtml}${btnSposHtml}<br>
+                          <span style="color:${nameColor}; font-weight:bold;">${nomeDisplay} ${badgeTag}</span>${btnRemoveHtml}${btnSposHtml}<br>
                           <span style="font-size:0.75rem; color:var(--text-muted);">${membro.inizio}-${membro.fine}</span> ${statusHtml}
                       </div>`;
                   });
