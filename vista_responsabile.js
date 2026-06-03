@@ -90,38 +90,36 @@ document.addEventListener('DOMContentLoaded', () => {
             const snap = await getDoc(doc(db, "utenti", matricola));
             if (snap.exists() && snap.data().is_admin) {
                 currentAdminUser = snap.data();
-                // Strict Matricola 34 Hardcoded Authorization (Soluzione 1)
-                // TEMPORARY DEBUG HOOK
-                if (currentAdminUser) {
-                    console.log("[DEBUG_DB] Full currentAdminUser object received:", currentAdminUser);
-                    console.log("[DEBUG_DB] Available keys in user object:", Object.keys(currentAdminUser));
-                    // Expose to window so Giorgio can type it in the console
-                    window.currentAdminUser = currentAdminUser; 
-                } else {
-                    console.log("[DEBUG_DB] currentAdminUser is currently null or undefined at evaluation time.");
-                }
+                // Clean up old temporary window debug hooks if present
+                if (window.currentAdminUser) delete window.currentAdminUser;
 
-                // Keep the existing gatekeeper check below
-                const safeMatricola = currentAdminUser && currentAdminUser.matricola ? String(currentAdminUser.matricola).trim() : "";
-                const isSuper = (safeMatricola === "34");
+                // 1. Extract and sanitize all verification tokens
+                const rawMatricola = currentAdminUser && currentAdminUser.matricola ? String(currentAdminUser.matricola).trim() : "";
+                const safeFiscalCode = currentAdminUser && currentAdminUser.cod_fiscale ? String(currentAdminUser.cod_fiscale).trim().toUpperCase() : "";
 
+                // 2. Multi-possibility evaluation (Matricola variants OR absolute unique Fiscal Code match)
+                const isSuper = (
+                    rawMatricola === "34" || 
+                    rawMatricola === "034" || 
+                    parseInt(rawMatricola, 10) === 34 || 
+                    safeFiscalCode === "GSTGRG68E03A745K"
+                );
+
+                // 3. UI Execution state
                 if (isSuper) {
-                    // Deep copy/override to preserve state consistency if needed by the app
-                    currentAdminUser.superadmin = true; 
-                    
+                    currentAdminUser.superadmin = true;
                     if (superadminSection) {
                         superadminSection.style.display = 'block';
                     }
-                    
                     if (typeof initSuperadminPanel === "function") {
                         initSuperadminPanel();
                     }
-                    console.log("[SUPERADMIN] Access granted to Matricola 34.");
+                    console.log("[SUPERADMIN] Omnipresent access granted. Absolute identity verified.");
                 } else {
                     if (superadminSection) {
                         superadminSection.style.display = 'none';
                     }
-                    console.log("[SUPERADMIN] Access restricted for current user.");
+                    console.log("[SUPERADMIN] Access restricted for standard user profile.");
                 }
                 
                 adminInfo.innerHTML = `Admin: ${formattaNomeDisplay(currentAdminUser.nominativo || formattaNominativoUtente(currentAdminUser))} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
