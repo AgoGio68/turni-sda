@@ -34,6 +34,7 @@ try {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  console.log("Vista Volontario - Ver. 1.7.3");
   // =====================================================
   //  STATO GLOBALE SOTTO UN UNICO SCOPE CHIUSO
   // =====================================================
@@ -89,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Apre il modal e ritorna una Promise che si risolve con { matricola, nominativo } o null
-  const apriVolPicker = async (bucoInizio, bucoFine) => {
+  const apriVolPicker = async (bucoInizio, bucoFine, turno, keyRuolo) => {
       // Carica utenti una sola volta e li mette in cache
       if (!utentiCache) {
           volPickerList.innerHTML = '<div style="text-align:center;padding:2rem;"><div class="spinner"></div><p style="color:var(--text-muted);font-size:0.85rem;">Caricamento volontari...</p></div>';
@@ -121,7 +122,34 @@ document.addEventListener('DOMContentLoaded', () => {
       volPickerList.innerHTML = '';
       volPickerSearch.value = '';
       volPickerEmpty.style.display = 'none';
+      let foundVolunteers = 0;
+
       utentiCache.forEach(u => {
+          const controlloMansione = verificaIscrizione(u, turno, keyRuolo);
+          if (!controlloMansione.idoneo) return;
+
+          const turniVolontario = turniList.reduce((acc, t) => {
+              if (t.id === turno.id) return acc;
+              const e = t.equipaggio_attuale || {};
+              ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(r => {
+                  if (e[r]) {
+                      e[r].forEach(a => {
+                          if (String(a.matricola) === String(u.id) || String(a.matricola) === String(u.matricola)) {
+                              acc.push({ data: t.data, inizio: a.inizio, fine: a.fine });
+                          }
+                      });
+                  }
+              });
+              return acc;
+          }, []);
+
+          let riposoCheck = { idoneo: true, motivo: "" };
+          if (typeof validaRiposi === 'function') {
+              riposoCheck = validaRiposi(turno.data, bucoInizio, bucoFine, turniVolontario);
+          }
+          if (!riposoCheck.idoneo) return;
+
+          foundVolunteers++;
           const nome = `${(u.cognome || '').trim()} ${(u.nome || '').trim()}`.trim();
           const mansione = u.mansione || u.ruoli_areu?.[0] || '';
           const item = document.createElement('button');
@@ -141,6 +169,10 @@ document.addEventListener('DOMContentLoaded', () => {
           });
           volPickerList.appendChild(item);
       });
+
+      if (foundVolunteers === 0) {
+          volPickerEmpty.style.display = 'block';
+      }
 
       volPickerSearch.focus();
 
@@ -573,16 +605,17 @@ document.addEventListener('DOMContentLoaded', () => {
             return acc;
         }, []);
 
-        let riposoCheck = { idoneo: true, motivo: "" };
-        if (typeof validaRiposi === 'function') {
-            riposoCheck = validaRiposi(turno.data, turno.orario?.inizio || "00:00", turno.orario?.fine || "00:00", myShifts);
-        }
         const regole = verificaIscrizione(currentUser, turno, keyRuolo);
 
         // --- OBIETTIVO 2: Un pulsante per ogni buco orario scoperto ---
         buchiOrario.forEach(buco => {
             const bucoLabel = `${buco.inizio}-${buco.fine}`;
             let btnStr = '';
+
+            let riposoCheck = { idoneo: true, motivo: "" };
+            if (typeof validaRiposi === 'function') {
+                riposoCheck = validaRiposi(turno.data, buco.inizio, buco.fine, myShifts);
+            }
 
             if (giaNelTurno && !iAmInThisRole) {
                 btnStr = '<span style="font-size:0.75rem; color:var(--neon-green)">Sei in un altro ruolo</span>';
@@ -592,7 +625,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (isKioskMode) {
                 btnStr = '';
             } else if (!riposoCheck.idoneo && !iAmInThisRole) {
-                btnStr = `<button class="btn btn-take" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-buco-inizio="${buco.inizio}" data-buco-fine="${buco.fine}">Verifica Orari</button>`;
+                btnStr = `<span style="font-size:0.75rem; color:var(--neon-red); font-weight:600;" title="${riposoCheck.motivo}">⚠️ No Riposo (11h)</span>`;
             } else if (!regole.idoneo) {
                 btnStr = `<span style="font-size:0.75rem; color:var(--text-muted);" title="${regole.motivo}">Non Idoneo</span>`;
             } else {
@@ -658,7 +691,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- OBIETTIVO 2: Assegnazione volontario tramite MODAL con barra di ricerca ---
   const assegnaVolontario = async (idTurno, ruolo, bucoInizio, bucoFine) => {
-    const selezione = await apriVolPicker(bucoInizio, bucoFine);
+    const turno = turniList.find(t => t.id === idTurno);
+    const selezione = await apriVolPicker(bucoInizio, bucoFine, turno, ruolo);
     if (!selezione) return; // utente ha chiuso il modal
 
     const { matricola, nominativo } = selezione;
