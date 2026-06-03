@@ -572,7 +572,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const isAdmin = currentUser && (currentUser.ruolo === 'admin' || currentUser.ruolo === 'superadmin' || currentUser.is_admin === true);
             const btnRemoveHtml = (isAdmin || isMe) ? `<button class="btn-remove-vol" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-inizio="${membro.inizio}" title="Rimuovi" style="background:transparent; border:none; cursor:pointer; margin-left:0.5rem;">❌</button>` : '';
-            const btnEditHtml = isMe ? `<button class="btn-edit-time" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-inizio="${membro.inizio}" data-fine="${membro.fine}" title="Modifica Orario Fine" style="background:transparent; border:none; cursor:pointer; margin-left:0.2rem; font-size:1rem;">✏️</button>` : '';
+            const btnEditHtml = (isMe || isAdmin) ? `<button class="btn-edit-time" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-inizio="${membro.inizio}" data-fine="${membro.fine}" title="Modifica Orario Fine" style="background:transparent; border:none; cursor:pointer; margin-left:0.2rem; font-size:1rem;">✏️</button>` : '';
             const statusBadge = membro.convalidato_da_admin ? '<span class="status-badge status-conv">[CONVALIDATO]</span>' : '<span class="status-badge status-wait">[IN ATTESA]</span>';
             const rowColorClass = membro.convalidato_da_admin ? 'slot-confermato' : 'slot-prenotato';
 
@@ -827,8 +827,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 equipaggio[ruolo] = vals;
             }
             if (equipaggio[ruolo]) {
+                const isAdmin = currentUser && (currentUser.ruolo === 'admin' || currentUser.ruolo === 'superadmin' || currentUser.is_admin === true);
                 equipaggio[ruolo] = equipaggio[ruolo].map(m => {
-                    if (String(m.matricola) === String(currentUser.matricola) && m.inizio === inizioSelezionato) {
+                    // Admin: match by inizio only (editing any member's record)
+                    // Self: also match by matricola for extra safety
+                    const matchAdmin = isAdmin && m.inizio === inizioSelezionato;
+                    const matchSelf = !isAdmin && String(m.matricola) === String(currentUser.matricola) && m.inizio === inizioSelezionato;
+                    if (matchAdmin || matchSelf) {
                         return { ...m, fine: nuovoOrarioFine.trim() };
                     }
                     return m;

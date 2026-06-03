@@ -1,6 +1,6 @@
 {
   "name": "turni-sda",
-  "version": "1.8.3",
+  "version": "1.8.4",
   "description": "Importazione utenti da CSV a Firebase",
   "main": "import.js",
   "type": "module",
