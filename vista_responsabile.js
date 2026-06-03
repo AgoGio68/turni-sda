@@ -91,6 +91,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (snap.exists() && snap.data().is_admin) {
                 currentAdminUser = snap.data();
                 // Strict Matricola 34 Hardcoded Authorization (Soluzione 1)
+                // TEMPORARY DEBUG HOOK
+                if (currentAdminUser) {
+                    console.log("[DEBUG_DB] Full currentAdminUser object received:", currentAdminUser);
+                    console.log("[DEBUG_DB] Available keys in user object:", Object.keys(currentAdminUser));
+                    // Expose to window so Giorgio can type it in the console
+                    window.currentAdminUser = currentAdminUser; 
+                } else {
+                    console.log("[DEBUG_DB] currentAdminUser is currently null or undefined at evaluation time.");
+                }
+
+                // Keep the existing gatekeeper check below
                 const safeMatricola = currentAdminUser && currentAdminUser.matricola ? String(currentAdminUser.matricola).trim() : "";
                 const isSuper = (safeMatricola === "34");
 
