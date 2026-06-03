@@ -36,7 +36,7 @@
     <div class="glass-panel" id="superadmin-section" style="display: none; border-color: var(--neon-orange); margin-bottom: 2rem;">
       <h2 style="color: var(--neon-orange); margin-top: 0;">👑 Gestione Permessi Admin (Solo AgoGio)</h2>
       <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Abilita o disabilita il flag is_admin per i volontari per fornire l'accesso a questa dashboard responsabile.</p>
-      <div style="overflow-x: auto; max-height: 300px;">
+      <div style="overflow-x: auto; max-height: 300px; margin-bottom: 2rem;">
         <table class="dashboard-table" id="superadmin-table">
           <thead>
             <tr>
@@ -51,6 +51,21 @@
             <!-- Generato dinamicamente -->
           </tbody>
         </table>
+      </div>
+
+      <div id="superadmin-rules-panel">
+        <h3 style="color: var(--neon-orange); margin-top: 2rem; border-top: 1px solid rgba(255, 165, 0, 0.3); padding-top: 1rem;">⚙️ Configurazione Regole Associazionismo</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Configura i vincoli di validazione sulle 11 ore di riposo.</p>
+        <div style="display: flex; flex-direction: column; gap: 1rem; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px;">
+          <label style="display: flex; align-items: center; gap: 1rem; color: var(--text-main); font-size: 1rem; cursor: pointer;">
+            <input type="checkbox" id="toggle-riposo-volontari" style="transform: scale(1.5);">
+            Applica vincolo 11h Riposo ai VOLONTARI
+          </label>
+          <label style="display: flex; align-items: center; gap: 1rem; color: var(--text-main); font-size: 1rem; cursor: pointer;">
+            <input type="checkbox" id="toggle-riposo-dipendenti" style="transform: scale(1.5);">
+            Applica vincolo 11h Riposo ai DIPENDENTI
+          </label>
+        </div>
       </div>
     </div>
 
@@ -138,6 +153,6 @@
     </div>
   </div>
 
-  <script type="module" src="vista_responsabile.js?v=1.6.11"></script>
+  <script type="module" src="vista_responsabile.js?v=1.7.4"></script>
 </body>
 </html>

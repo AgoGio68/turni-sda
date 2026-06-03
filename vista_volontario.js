@@ -34,7 +34,7 @@ try {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log("Vista Volontario - Ver. 1.7.3");
+  console.log("Vista Volontario - Ver. 1.7.4");
   // =====================================================
   //  STATO GLOBALE SOTTO UN UNICO SCOPE CHIUSO
   // =====================================================
@@ -45,6 +45,15 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeUnsubscribeTurni = null;
   let isUpdating = false;
   let utentiCache = null; // Cache lista volontari per il modal admin
+  
+  let configLive = { controllaRiposoVolontari: true, controllaRiposoDipendenti: false };
+  onSnapshot(doc(db, "impostazioni", "regole_riposo"), (snap) => {
+      if (snap.exists()) {
+          const data = snap.data();
+          configLive.controllaRiposoVolontari = !!data.controllaRiposoVolontari;
+          configLive.controllaRiposoDipendenti = !!data.controllaRiposoDipendenti;
+      }
+  });
 
   // Elementi DOM mappati singolarmente
   const userInfoDiv = document.getElementById('user-info');
@@ -144,8 +153,14 @@ document.addEventListener('DOMContentLoaded', () => {
           }, []);
 
           let riposoCheck = { idoneo: true, motivo: "" };
-          if (typeof validaRiposi === 'function') {
-              riposoCheck = validaRiposi(turno.data, bucoInizio, bucoFine, turniVolontario);
+          const utenteTipoRapporto = u.tipoRapporto || "Volontario";
+          const deveControllare = (utenteTipoRapporto === "Volontario" && configLive.controllaRiposoVolontari) || 
+                                  (utenteTipoRapporto === "Dipendente" && configLive.controllaRiposoDipendenti);
+
+          if (deveControllare) {
+              if (typeof validaRiposi === 'function') {
+                  riposoCheck = validaRiposi(turno.data, bucoInizio, bucoFine, turniVolontario);
+              }
           }
           if (!riposoCheck.idoneo) return;
 
@@ -613,8 +628,14 @@ document.addEventListener('DOMContentLoaded', () => {
             let btnStr = '';
 
             let riposoCheck = { idoneo: true, motivo: "" };
-            if (typeof validaRiposi === 'function') {
-                riposoCheck = validaRiposi(turno.data, buco.inizio, buco.fine, myShifts);
+            const myTipoRapporto = currentUser.tipoRapporto || "Volontario";
+            const deveControllare = (myTipoRapporto === "Volontario" && configLive.controllaRiposoVolontari) || 
+                                    (myTipoRapporto === "Dipendente" && configLive.controllaRiposoDipendenti);
+
+            if (deveControllare) {
+                if (typeof validaRiposi === 'function') {
+                    riposoCheck = validaRiposi(turno.data, buco.inizio, buco.fine, myShifts);
+                }
             }
 
             if (giaNelTurno && !iAmInThisRole) {

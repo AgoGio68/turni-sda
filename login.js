@@ -33,13 +33,13 @@ try {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // 1. Caricamento versione
-  try {
-    const res = await fetch('./versione_app.json');
-    const data = await res.json();
-    document.getElementById('version-text').textContent = `Ver. ${data.versione}`;
-  } catch (e) {
-    document.getElementById('version-text').textContent = `Ver. Sconosciuta`;
+  // Safe version injection
+  const APP_VERSION = "1.7.4";
+  const versionEl = document.getElementById('app-version-label');
+  if (versionEl) {
+      versionEl.textContent = `v${APP_VERSION}`; 
+  } else {
+      console.warn("Element 'app-version-label' not found in the current DOM layout.");
   }
 
   const btnLogin = document.getElementById('btn-login');

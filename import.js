@@ -44,7 +44,8 @@ fs.createReadStream('dbsocc.csv')
           dtscad120: data.dtscad120 || "", 
           dtscaddae: data.dtscaddae || "" 
         },
-        override_admin: { qualifica_manuale: "", note: "" }
+        override_admin: { qualifica_manuale: "", note: "" },
+        tipoRapporto: (data.rapporto && data.rapporto.trim() === "Dipendente") ? "Dipendente" : "Volontario"
       });
     }
 
