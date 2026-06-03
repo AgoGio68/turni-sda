@@ -13,7 +13,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, query, onSnapshot, doc, getDoc, runTransaction } from "firebase/firestore";
 import { verificaIscrizione, validaRiposi } from './regole_iscrizione.js';
-import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo } from './utils.js';
+import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo, calcolaBuchiRuolo } from './utils.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -76,11 +76,22 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
       }
 
-      // Case 1: Iscrizione standard o aggiunta fascia oraria parziale
+      // Case 1: Iscrizione standard (Prendi Turno con orario pre-calcolato)
       if (e.target.classList.contains('btn-take')) {
           const idTurno = e.target.getAttribute('data-turno');
           const ruolo = e.target.getAttribute('data-ruolo');
-          await iscriviti(idTurno, ruolo);
+          const bucoInizio = e.target.getAttribute('data-buco-inizio');
+          const bucoFine = e.target.getAttribute('data-buco-fine');
+          await iscriviti(idTurno, ruolo, bucoInizio, bucoFine);
+      }
+      
+      // Case 4: Assegnazione a un altro volontario (admin/responsabile)
+      if (e.target.classList.contains('btn-assign-vol')) {
+          const idTurno = e.target.getAttribute('data-turno');
+          const ruolo = e.target.getAttribute('data-ruolo');
+          const bucoInizio = e.target.getAttribute('data-buco-inizio');
+          const bucoFine = e.target.getAttribute('data-buco-fine');
+          await assegnaVolontario(idTurno, ruolo, bucoInizio, bucoFine);
       }
       
       // Case 2: Rimozione selettiva di un blocco di presenza
@@ -428,13 +439,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    const isFull = calcolaCoperturaRuolo(assegnazioni, turno.orario?.inizio || "00:00", turno.orario?.fine || "00:00").isFull;
+    const inizioTurno = turno.orario?.inizio || "00:00";
+    const fineTurno = turno.orario?.fine || "00:00";
+    const isFull = calcolaCoperturaRuolo(assegnazioni, inizioTurno, fineTurno).isFull;
 
     if (!isFull) {
+        // --- OBIETTIVO 1: Calcolo matematico dei segmenti orari scoperti ---
+        const buchiOrario = calcolaBuchiRuolo(assegnazioni, inizioTurno, fineTurno);
+
         const eqCompleto = turno.equipaggio_attuale || {};
         const giaNelTurno = ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].some(r => 
             eqCompleto[r] && eqCompleto[r].some(a => String(a.matricola) === myIdStr)
         );
+        const isAdmin = currentUser && (currentUser.ruolo === 'admin' || currentUser.ruolo === 'superadmin' || currentUser.is_admin === true);
 
         const myShifts = turniList.reduce((acc, t) => {
             if (t.id === turno.id) return acc;
@@ -456,34 +473,41 @@ document.addEventListener('DOMContentLoaded', () => {
             riposoCheck = validaRiposi(turno.data, turno.orario?.inizio || "00:00", turno.orario?.fine || "00:00", myShifts);
         }
         const regole = verificaIscrizione(currentUser, turno, keyRuolo);
-        let btnStr = '';
 
-        if (giaNelTurno && !iAmInThisRole) {
-            btnStr = '<span style="font-size:0.75rem; color:var(--neon-green)">Sei in un altro ruolo</span>';
-        } else if (giaNelTurno && iAmInThisRole) {
-            btnStr = `<button class="btn btn-take" data-turno="${turno.id}" data-ruolo="${keyRuolo}">Copri Altro Orario</button>`;
-        } else if (isKioskMode) {
-            btnStr = '';
-        } else if (!riposoCheck.idoneo && !iAmInThisRole) {
-            btnStr = `<button class="btn btn-take" data-turno="${turno.id}" data-ruolo="${keyRuolo}">Verifica Orari</button>`;
-        } else if (!regole.idoneo) {
-            btnStr = `<span style="font-size:0.75rem; color:var(--text-muted);" title="${regole.motivo}">Non Idoneo</span>`;
-        } else {
-            btnStr = `<button class="btn btn-take" data-turno="${turno.id}" data-ruolo="${keyRuolo}">Prendi Turno</button>`;
-        }
+        // --- OBIETTIVO 2: Un pulsante per ogni buco orario scoperto ---
+        buchiOrario.forEach(buco => {
+            const bucoLabel = `${buco.inizio}-${buco.fine}`;
+            let btnStr = '';
 
-        html += `
-            <div class="slot-row">
-                <div class="slot-info">
-                    <span class="slot-icon" style="opacity:0.3">${icon}</span>
-                    <div>
-                        <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">${labelRuolo}</div>
-                        <div style="font-weight:600; color:var(--neon-red); font-style:italic; font-size:0.9rem;">🛞 [Posto Disponibile]</div>
+            if (giaNelTurno && !iAmInThisRole) {
+                btnStr = '<span style="font-size:0.75rem; color:var(--neon-green)">Sei in un altro ruolo</span>';
+            } else if (isAdmin || (giaNelTurno && iAmInThisRole)) {
+                // Admin o già nel ruolo → Assegna un altro volontario per matricola
+                btnStr = `<button class="btn btn-assign-vol" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-buco-inizio="${buco.inizio}" data-buco-fine="${buco.fine}">👤 Assegna Volontario</button>`;
+            } else if (isKioskMode) {
+                btnStr = '';
+            } else if (!riposoCheck.idoneo && !iAmInThisRole) {
+                btnStr = `<button class="btn btn-take" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-buco-inizio="${buco.inizio}" data-buco-fine="${buco.fine}">Verifica Orari</button>`;
+            } else if (!regole.idoneo) {
+                btnStr = `<span style="font-size:0.75rem; color:var(--text-muted);" title="${regole.motivo}">Non Idoneo</span>`;
+            } else {
+                // Volontario standard idoneo → Prendi Turno con orario pre-calcolato
+                btnStr = `<button class="btn btn-take" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-buco-inizio="${buco.inizio}" data-buco-fine="${buco.fine}">Prendi Turno (${bucoLabel})</button>`;
+            }
+
+            html += `
+                <div class="slot-row">
+                    <div class="slot-info">
+                        <span class="slot-icon" style="opacity:0.3">${icon}</span>
+                        <div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">${labelRuolo}</div>
+                            <div style="font-weight:600; color:var(--neon-red); font-style:italic; font-size:0.9rem;">⏱ Scoperto: ${bucoLabel}</div>
+                        </div>
                     </div>
+                    ${btnStr}
                 </div>
-                ${btnStr}
-            </div>
-        `;
+            `;
+        });
     }
 
     return html;
@@ -519,13 +543,68 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("Errore rimozione:", e);
     } finally {
         isUpdating = false;
-        renderMacroCalendar();
-        if (currentSelectedDate) renderMicroDay(currentSelectedDate);
+        // Rendering delegato a onSnapshot per dati sempre freschi
     }
   };
 
-  const iscriviti = async (idTurno, ruolo) => {
-    console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Iscrizione a ${idTurno} ruolo ${ruolo}`);
+  // --- OBIETTIVO 2: Nuova funzione per assegnare un altro volontario per matricola ---
+  const assegnaVolontario = async (idTurno, ruolo, bucoInizio, bucoFine) => {
+    const matricolaInput = prompt(
+        `Assegna un volontario per coprire ${bucoInizio}-${bucoFine}.\nInserisci la Matricola del volontario:`
+    );
+    if (!matricolaInput) return;
+    const matricola = matricolaInput.trim();
+
+    // Lookup su Firestore per validare la matricola e recuperare nome/cognome
+    let utenteData;
+    try {
+        const utenteSnap = await getDoc(doc(db, "utenti", matricola));
+        if (!utenteSnap.exists()) {
+            alert(`Matricola "${matricola}" non trovata nel database.`);
+            return;
+        }
+        utenteData = utenteSnap.data();
+    } catch (e) {
+        console.error("Errore lookup matricola:", e);
+        alert("Errore durante la ricerca della matricola.");
+        return;
+    }
+
+    const nominativo = `${utenteData.cognome || ''} ${utenteData.nome || ''}`.trim() || 'Sconosciuto';
+    if (!confirm(`Confermi l'assegnazione di ${nominativo} (${matricola}) per ${bucoInizio}-${bucoFine}?`)) return;
+
+    console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Assegnazione volontario ${matricola} a ${idTurno} ruolo ${ruolo} per ${bucoInizio}-${bucoFine}`);
+    isUpdating = true;
+
+    try {
+        const docRef = doc(db, "turni", idTurno);
+        await runTransaction(db, async (transaction) => {
+            const snap = await transaction.get(docRef);
+            if (!snap.exists()) throw "Turno non trovato";
+            let equipaggio = snap.data().equipaggio_attuale || {};
+            if (!equipaggio[ruolo]) equipaggio[ruolo] = [];
+
+            equipaggio[ruolo].push({
+                matricola: matricola,
+                nominativo: nominativo,
+                inizio: bucoInizio,
+                fine: bucoFine,
+                convalidato_da_admin: false
+            });
+            transaction.update(docRef, { equipaggio_attuale: equipaggio });
+        });
+        console.log("[DEBUG_DB] CONFERMA_FIRESTORE: Assegnazione volontario confermata da DB");
+    } catch (e) {
+        console.error("Errore assegnazione volontario:", e);
+        alert("Errore nell'assegnazione: " + e);
+    } finally {
+        isUpdating = false;
+        // Rendering delegato a onSnapshot per dati sempre freschi
+    }
+  };
+
+  const iscriviti = async (idTurno, ruolo, bucoInizio, bucoFine) => {
+    console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Iscrizione a ${idTurno} ruolo ${ruolo} orario ${bucoInizio}-${bucoFine}`);
     isUpdating = true;
 
     try {
@@ -538,27 +617,9 @@ document.addEventListener('DOMContentLoaded', () => {
             let equipaggio = turnoData.equipaggio_attuale || {};
             if (!equipaggio[ruolo]) equipaggio[ruolo] = [];
 
-            const giaPresente = equipaggio[ruolo].some(m => String(m.matricola) === String(currentUser.matricola));
-
-            let oraInizio = turnoData.orario?.inizio || "08:00";
-            let oraFine = turnoData.orario?.fine || "14:00";
-
-            if (giaPresente) {
-                const inputOrario = prompt(
-                    `Fai già parte di questo equipaggio.\nInserisci l'orario aggiuntivo che vuoi coprire (Formato HH:MM-HH:MM):`, 
-                    `${oraInizio}-${oraFine}`
-                );
-                if (!inputOrario) throw "OPERAZIONE_ANNULLATA";
-
-                const parti = inputOrario.split('-');
-                if (parti.length === 2 && parti[0].includes(':') && parti[1].includes(':')) {
-                    oraInizio = parti[0].trim();
-                    oraFine = parti[1].trim();
-                } else {
-                    alert("Formato orario errato! Usa HH:MM-HH:MM");
-                    throw "FORMATO_ERRATO";
-                }
-            }
+            // Orario pre-calcolato dal buco residuo, nessun prompt necessario
+            const oraInizio = bucoInizio || turnoData.orario?.inizio || "08:00";
+            const oraFine = bucoFine || turnoData.orario?.fine || "14:00";
 
             const nuovoMembro = {
                 matricola: currentUser.matricola,
@@ -574,13 +635,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         console.log("[DEBUG_DB] CONFERMA_FIRESTORE: Iscrizione confermata da DB");
     } catch (error) {
-        if (error !== "OPERAZIONE_ANNULLATA" && error !== "FORMATO_ERRATO") {
-            console.error("Errore iscrizione:", error);
-        }
+        console.error("Errore iscrizione:", error);
     } finally {
         isUpdating = false;
-        renderMacroCalendar();
-        if (currentSelectedDate) renderMicroDay(currentSelectedDate);
+        // Rendering delegato a onSnapshot per dati sempre freschi
     }
   };
 
@@ -621,8 +679,7 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("Errore nell'aggiornamento: " + e);
     } finally {
         isUpdating = false;
-        renderMacroCalendar();
-        if (currentSelectedDate) renderMicroDay(currentSelectedDate);
+        // Rendering delegato a onSnapshot per dati sempre freschi
     }
   };
 
