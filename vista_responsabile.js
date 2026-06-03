@@ -451,13 +451,14 @@ document.addEventListener('DOMContentLoaded', () => {
                       const isAdmin = currentAdminUser?.ruolo === 'admin' || currentAdminUser?.ruolo === 'superadmin' || currentAdminUser?.is_admin === true || currentAdminUser?.superadmin === true;
                       const btnRemoveHtml = isAdmin ? `<button class="admin-remove-vol" data-turno="${turno.id}" data-ruolo="${roleKey}" data-matricola="${membro.matricola}" title="Rimuovi Volontario" style="background:transparent; border:none; cursor:pointer; margin-left:0.3rem; color:var(--neon-red); font-size:1rem; padding:0;">❌</button>` : '';
                       const btnSposHtml = isAdmin && !spostamentoAttivoGlobale ? `<button class="admin-sposta-vol" data-turno="${turno.id}" data-ruolo="${roleKey}" data-matricola="${membro.matricola}" title="Sposta Volontario" style="background:transparent; border:none; cursor:pointer; margin-left:0.3rem; color:var(--neon-orange); font-size:1rem; padding:0;">🔄</button>` : '';
+                      const btnEditTimeHtml = isAdmin ? `<button class="admin-edit-time" data-turno="${turno.id}" data-ruolo="${roleKey}" data-inizio="${membro.inizio}" data-fine="${membro.fine}" data-matricola="${membro.matricola}" title="Modifica Orario" style="background:transparent; border:none; cursor:pointer; margin-left:0.3rem; color:#00f2fe; font-size:1rem; padding:0;">✏️</button>` : '';
 
                       const statusHtml = membro.convalidato_da_admin 
                           ? `<span style="font-size:0.6rem; color:var(--neon-green);">✓ Conv.</span>`
                           : `<span style="font-size:0.6rem; color:#38bdf8;">⚠ Attesa</span>`;
                           
                       html += `<div style="margin-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.2rem;">
-                          <span style="color:${nameColor}; font-weight:bold;">${nomeDisplay} ${badgeTag}</span>${btnRemoveHtml}${btnSposHtml}<br>
+                          <span style="color:${nameColor}; font-weight:bold;">${nomeDisplay} ${badgeTag}</span>${btnEditTimeHtml}${btnRemoveHtml}${btnSposHtml}<br>
                           <span style="font-size:0.75rem; color:var(--text-muted);">${membro.inizio}-${membro.fine}</span> ${statusHtml}
                       </div>`;
                   });
@@ -566,7 +567,50 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        document.querySelectorAll('.admin-edit-time').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const idTurno = e.currentTarget.getAttribute('data-turno');
+                const ruolo = e.currentTarget.getAttribute('data-ruolo');
+                const inizio = e.currentTarget.getAttribute('data-inizio');
+                const fineAttuale = e.currentTarget.getAttribute('data-fine');
+                await modificaOrarioAdmin(idTurno, ruolo, inizio, fineAttuale);
+            });
+        });
+
         attachActionListeners();
+      };
+
+      const modificaOrarioAdmin = async (idTurno, ruolo, inizioSelezionato, fineAttuale) => {
+        const nuovaFine = prompt(`Modifica orario FINE per questo slot (Inizio: ${inizioSelezionato}):`, fineAttuale);
+        if (!nuovaFine) return;
+        if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(nuovaFine.trim())) {
+            alert("Formato non valido! Usa HH:MM (es. 19:00)");
+            return;
+        }
+        try {
+            const docRef = doc(db, "turni", idTurno);
+            await runTransaction(db, async (transaction) => {
+                const snap = await transaction.get(docRef);
+                if (!snap.exists()) throw "Turno non trovato";
+                let equipaggio = snap.data().equipaggio_attuale || {};
+                if (equipaggio[ruolo] && !Array.isArray(equipaggio[ruolo])) {
+                    equipaggio[ruolo] = Object.values(equipaggio[ruolo]).filter(v => v && typeof v === 'object' && v.matricola);
+                }
+                if (equipaggio[ruolo]) {
+                    equipaggio[ruolo] = equipaggio[ruolo].map(m => {
+                        if (m.inizio === inizioSelezionato) {
+                            return { ...m, fine: nuovaFine.trim() };
+                        }
+                        return m;
+                    });
+                }
+                transaction.update(docRef, { equipaggio_attuale: equipaggio });
+            });
+            console.log(`[ADMIN] Orario fine aggiornato a ${nuovaFine} per slot ${ruolo} inizio ${inizioSelezionato}`);
+        } catch (err) {
+            console.error("Errore modifica orario admin:", err);
+            alert("Errore nell'aggiornamento: " + err);
+        }
       };
 
       const rimuoviVolontarioImprevisto = async (idTurno, ruolo, matricola) => {
