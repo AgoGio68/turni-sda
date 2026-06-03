@@ -90,14 +90,27 @@ document.addEventListener('DOMContentLoaded', () => {
             const snap = await getDoc(doc(db, "utenti", matricola));
             if (snap.exists() && snap.data().is_admin) {
                 currentAdminUser = snap.data();
-                
-                const isSuper = (currentAdminUser.ruolo === 'superadmin' || currentAdminUser.superadmin === true);
+                // Strict Matricola 34 Hardcoded Authorization (Soluzione 1)
+                const safeMatricola = currentAdminUser && currentAdminUser.matricola ? String(currentAdminUser.matricola).trim() : "";
+                const isSuper = (safeMatricola === "34");
+
                 if (isSuper) {
-                    currentAdminUser.superadmin = true;
-                    superadminSection.style.display = 'block';
-                    initSuperadminPanel();
+                    // Deep copy/override to preserve state consistency if needed by the app
+                    currentAdminUser.superadmin = true; 
+                    
+                    if (superadminSection) {
+                        superadminSection.style.display = 'block';
+                    }
+                    
+                    if (typeof initSuperadminPanel === "function") {
+                        initSuperadminPanel();
+                    }
+                    console.log("[SUPERADMIN] Access granted to Matricola 34.");
                 } else {
-                    superadminSection.style.display = 'none';
+                    if (superadminSection) {
+                        superadminSection.style.display = 'none';
+                    }
+                    console.log("[SUPERADMIN] Access restricted for current user.");
                 }
                 
                 adminInfo.innerHTML = `Admin: ${formattaNomeDisplay(currentAdminUser.nominativo || formattaNominativoUtente(currentAdminUser))} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
