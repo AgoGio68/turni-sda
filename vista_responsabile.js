@@ -282,56 +282,40 @@ document.addEventListener('DOMContentLoaded', () => {
               });
           });
       });
-      // Strict Soluzione 1 Superadmin Authorization Check
+      // =====================================================================
+      // PHASE 2: BULLETPROOF GATEKEEPER — multi-criteria isSuper evaluation
+      // Covers: matricola "34", legacy "034", parseInt fallback, and Fiscal Code
+      // =====================================================================
       const superadminPanel = document.getElementById('superadmin-rules-panel');
-      if (currentAdminUser && String(currentAdminUser.matricola).trim() === "34") {
+      const rawMatricolaCheck = currentAdminUser ? String(currentAdminUser.matricola || '').trim() : '';
+      const safeFiscalCodeCheck = currentAdminUser ? String(currentAdminUser.cod_fiscale || '').trim().toUpperCase() : '';
+      const isSuperForPanel = (
+          rawMatricolaCheck === "34" ||
+          rawMatricolaCheck === "034" ||
+          parseInt(rawMatricolaCheck, 10) === 34 ||
+          safeFiscalCodeCheck === "GSTGRG68E03A745K"
+      );
+
+      if (isSuperForPanel) {
           if (superadminPanel) {
               superadminPanel.style.display = 'block';
+              // Render plain checkboxes (no .switch dependency) for maximum reliability
               superadminPanel.innerHTML = `
-        <div style="padding: 20px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05);">
-            <h3 style="color: #00f2fe; margin-top: 0; font-size: 1.1rem; text-transform: uppercase;">🛠️ Controllo Vincoli Orari 11h</h3>
-            
-            <!-- Volontari Switch -->
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                <div>
-                    <label style="font-weight: 600; color: #fff; display: block;">Attiva blocco 11h VOLONTARI</label>
-                    <span style="font-size: 0.8rem; color: #888;">Forza il riposo di 11 ore per il personale volontario.</span>
+                <div style="padding: 15px; background: rgba(255, 255, 255, 0.03); border: 1px solid #00f2fe; border-radius: 8px; margin-bottom: 15px;">
+                    <h4 style="color: #00f2fe; margin: 0 0 10px 0; font-size: 1rem; text-transform: uppercase;">Gestione Vincoli Orari 11h</h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <label style="color: #fff;">Blocco 11h VOLONTARI</label>
+                        <input type="checkbox" id="toggle-riposo-volontari" style="transform: scale(1.2); cursor: pointer;">
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label style="color: #fff;">Blocco 11h DIPENDENTI</label>
+                        <input type="checkbox" id="toggle-riposo-dipendenti" style="transform: scale(1.2); cursor: pointer;">
+                    </div>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" id="toggle-riposo-volontari">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <!-- Dipendenti Switch -->
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div>
-                    <label style="font-weight: 600; color: #fff; display: block;">Attiva blocco 11h DIPENDENTI</label>
-                    <span style="font-size: 0.8rem; color: #888;">Forza il riposo di 11 ore per il personale dipendente (attualmente flessibile).</span>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="toggle-riposo-dipendenti">
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </div>
               `;
-              
-              if (!document.getElementById('switch-styles-dynamic')) {
-                  const style = document.createElement('style');
-                  style.id = 'switch-styles-dynamic';
-                  style.innerHTML = `
-                    .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
-                    .switch input { opacity: 0; width: 0; height: 0; }
-                    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 24px; }
-                    .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-                    input:checked + .slider { background-color: #00f2fe; }
-                    input:focus + .slider { box-shadow: 0 0 1px #00f2fe; }
-                    input:checked + .slider:before { transform: translateX(26px); }
-                  `;
-                  document.head.appendChild(style);
-              }
           }
+
+          // Bind to Firestore live listener AFTER innerHTML has been written (elements now exist in DOM)
           const toggleVolontari = document.getElementById('toggle-riposo-volontari');
           const toggleDipendenti = document.getElementById('toggle-riposo-dipendenti');
 
@@ -343,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
                       toggleVolontari.checked = !!data.controllaRiposoVolontari;
                       toggleDipendenti.checked = !!data.controllaRiposoDipendenti;
                   } else {
-                      // Initialize if it doesn't exist
+                      // Document doesn't exist yet — initialize with safe defaults
                       await setDoc(doc(db, "impostazioni", "regole_riposo"), {
                           controllaRiposoVolontari: true,
                           controllaRiposoDipendenti: false
@@ -365,12 +349,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
               toggleVolontari.addEventListener('change', updateRules);
               toggleDipendenti.addEventListener('change', updateRules);
+          } else {
+              console.warn("[SUPERADMIN] Toggle elements not found after innerHTML inject. Check #superadmin-rules-panel.");
           }
       } else {
-          // Completely hide, block, or remove the configuration container from the DOM for any other user
+          // Non-destructive hide: preserve node in DOM to prevent null crashes on re-render cycles
           if (superadminPanel) {
-              superadminPanel.remove(); 
+              superadminPanel.style.display = 'none';
           }
+          console.log("[SUPERADMIN] Panel hidden for non-superadmin user.");
       }
   }
 
