@@ -154,15 +154,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
           let riposoCheck = { idoneo: true, motivo: "" };
           const utenteTipoRapporto = u.tipoRapporto || "Volontario";
-          const deveControllare = (utenteTipoRapporto === "Volontario" && configLive.controllaRiposoVolontari) || 
-                                  (utenteTipoRapporto === "Dipendente" && configLive.controllaRiposoDipendenti);
+          const isRuleActive = (utenteTipoRapporto === "Volontario" && configLive.controllaRiposoVolontari) || 
+                               (utenteTipoRapporto === "Dipendente" && configLive.controllaRiposoDipendenti);
 
-          if (deveControllare) {
+          if (isRuleActive) {
               if (typeof validaRiposi === 'function') {
                   riposoCheck = validaRiposi(turno.data, bucoInizio, bucoFine, turniVolontario);
               }
           }
-          if (!riposoCheck.idoneo) return;
+          if (isRuleActive && !riposoCheck.idoneo) return;
 
           foundVolunteers++;
           const nome = `${(u.cognome || '').trim()} ${(u.nome || '').trim()}`.trim();
@@ -629,10 +629,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let riposoCheck = { idoneo: true, motivo: "" };
             const myTipoRapporto = currentUser.tipoRapporto || "Volontario";
-            const deveControllare = (myTipoRapporto === "Volontario" && configLive.controllaRiposoVolontari) || 
-                                    (myTipoRapporto === "Dipendente" && configLive.controllaRiposoDipendenti);
+            const isRuleActive = (myTipoRapporto === "Volontario" && configLive.controllaRiposoVolontari) || 
+                                 (myTipoRapporto === "Dipendente" && configLive.controllaRiposoDipendenti);
 
-            if (deveControllare) {
+            if (isRuleActive) {
                 if (typeof validaRiposi === 'function') {
                     riposoCheck = validaRiposi(turno.data, buco.inizio, buco.fine, myShifts);
                 }
@@ -645,7 +645,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnStr = `<button class="btn btn-assign-vol" data-turno="${turno.id}" data-ruolo="${keyRuolo}" data-buco-inizio="${buco.inizio}" data-buco-fine="${buco.fine}">👤 Assegna Volontario</button>`;
             } else if (isKioskMode) {
                 btnStr = '';
-            } else if (!riposoCheck.idoneo && !iAmInThisRole) {
+            } else if (isRuleActive && !riposoCheck.idoneo && !iAmInThisRole) {
                 btnStr = `<span style="font-size:0.75rem; color:var(--neon-red); font-weight:600;" title="${riposoCheck.motivo}">⚠️ No Riposo (11h)</span>`;
             } else if (!regole.idoneo) {
                 btnStr = `<span style="font-size:0.75rem; color:var(--text-muted);" title="${regole.motivo}">Non Idoneo</span>`;

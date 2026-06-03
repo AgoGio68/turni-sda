@@ -263,25 +263,34 @@ document.addEventListener('DOMContentLoaded', () => {
       // Strict Soluzione 1 Superadmin Authorization Check
       const superadminPanel = document.getElementById('superadmin-rules-panel');
       if (currentAdminUser && String(currentAdminUser.matricola).trim() === "34") {
+          if (superadminPanel) {
+              superadminPanel.style.display = 'block';
+          }
           const toggleVolontari = document.getElementById('toggle-riposo-volontari');
           const toggleDipendenti = document.getElementById('toggle-riposo-dipendenti');
 
           if (toggleVolontari && toggleDipendenti) {
               if (activeUnsubscribes.regole_riposo) activeUnsubscribes.regole_riposo();
-              activeUnsubscribes.regole_riposo = onSnapshot(doc(db, "impostazioni", "regole_riposo"), (snap) => {
+              activeUnsubscribes.regole_riposo = onSnapshot(doc(db, "impostazioni", "regole_riposo"), async (snap) => {
                   if (snap.exists()) {
                       const data = snap.data();
                       toggleVolontari.checked = !!data.controllaRiposoVolontari;
                       toggleDipendenti.checked = !!data.controllaRiposoDipendenti;
+                  } else {
+                      // Initialize if it doesn't exist
+                      await setDoc(doc(db, "impostazioni", "regole_riposo"), {
+                          controllaRiposoVolontari: true,
+                          controllaRiposoDipendenti: false
+                      });
                   }
               });
 
               const updateRules = async () => {
                   try {
-                      await setDoc(doc(db, "impostazioni", "regole_riposo"), {
+                      await updateDoc(doc(db, "impostazioni", "regole_riposo"), {
                           controllaRiposoVolontari: toggleVolontari.checked,
                           controllaRiposoDipendenti: toggleDipendenti.checked
-                      }, { merge: true });
+                      });
                   } catch(e) {
                       console.error("Errore update regole riposo", e);
                       alert("Errore durante il salvataggio della configurazione.");

@@ -53,18 +53,32 @@
         </table>
       </div>
 
-      <div id="superadmin-rules-panel">
-        <h3 style="color: var(--neon-orange); margin-top: 2rem; border-top: 1px solid rgba(255, 165, 0, 0.3); padding-top: 1rem;">⚙️ Configurazione Regole Associazionismo</h3>
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Configura i vincoli di validazione sulle 11 ore di riposo.</p>
-        <div style="display: flex; flex-direction: column; gap: 1rem; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px;">
-          <label style="display: flex; align-items: center; gap: 1rem; color: var(--text-main); font-size: 1rem; cursor: pointer;">
-            <input type="checkbox" id="toggle-riposo-volontari" style="transform: scale(1.5);">
-            Applica vincolo 11h Riposo ai VOLONTARI
-          </label>
-          <label style="display: flex; align-items: center; gap: 1rem; color: var(--text-main); font-size: 1rem; cursor: pointer;">
-            <input type="checkbox" id="toggle-riposo-dipendenti" style="transform: scale(1.5);">
-            Applica vincolo 11h Riposo ai DIPENDENTI
-          </label>
+      <div id="superadmin-rules-panel" style="display: none; margin-top: 20px; padding: 20px; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);">
+        <h3 style="color: #00f2fe; margin-top: 0; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px;">🛠️ Configurazione Regole Associazionismo (Superadmin)</h3>
+        <p style="font-size: 0.85rem; color: #aaa; margin-bottom: 20px;">Gestione globale in tempo reale dei vincoli orari sui turni. Le modifiche si applicano istantaneamente.</p>
+        
+        <!-- Volontari Toggle -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            <div>
+                <label style="font-weight: 600; color: #fff; display: block;">Controlla vincolo 11h per VOLONTARI</label>
+                <span style="font-size: 0.8rem; color: #888;">Blocca i turni se non rispettano le 11 ore di riposo.</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="toggle-riposo-volontari">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <!-- Dipendenti Toggle -->
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <label style="font-weight: 600; color: #fff; display: block;">Controlla vincolo 11h per DIPENDENTI</label>
+                <span style="font-size: 0.8rem; color: #888;">Attiva il controllo anche per il personale dipendente (attualmente flessibile).</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="toggle-riposo-dipendenti">
+                <span class="slider"></span>
+            </label>
         </div>
       </div>
     </div>
