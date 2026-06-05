@@ -34,10 +34,17 @@
     
     <!-- SEZIONE SUPERADMIN -->
     <div class="glass-panel" id="superadmin-section" style="display: none; border-color: var(--neon-orange); margin-bottom: 2rem;">
-      <h2 style="color: var(--neon-orange); margin-top: 0;">👑 Gestione Permessi Admin (Solo AgoGio)</h2>
-      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">Abilita o disabilita il flag is_admin per i volontari per fornire l'accesso a questa dashboard responsabile.</p>
-      <div style="overflow-x: auto; max-height: 300px; margin-bottom: 2rem;">
-        <table class="dashboard-table" id="superadmin-table">
+      <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" id="superadmin-toggle-header">
+        <div>
+          <h2 style="color: var(--neon-orange); margin-top: 0; margin-bottom: 0;">👑 Gestione Permessi Admin (Solo AgoGio)</h2>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0; margin-top: 0.5rem;">Clicca per espandere i permessi e i vincoli orari.</p>
+        </div>
+        <button class="btn" id="btn-toggle-superadmin" style="background: rgba(255,165,0,0.1); border-color: var(--neon-orange); color: var(--neon-orange); pointer-events: none;">🔽 Apri Pannello</button>
+      </div>
+
+      <div id="superadmin-content" style="display: none; margin-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1.5rem;">
+        <div style="overflow-x: auto; max-height: 300px; margin-bottom: 2rem;">
+          <table class="dashboard-table" id="superadmin-table">
           <thead>
             <tr>
               <th>Matricola</th>
@@ -79,6 +86,8 @@
                 <input type="checkbox" id="toggle-riposo-dipendenti">
                 <span class="slider"></span>
             </label>
+        </div>
+      </div>
         </div>
       </div>
     </div>

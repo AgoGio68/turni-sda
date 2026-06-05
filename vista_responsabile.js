@@ -42,7 +42,25 @@ const activeUnsubscribes = {};
 const stagingBar = document.getElementById('staging-bar');
 const stagingCount = document.getElementById('staging-count');
 const tbody = document.querySelector('#admin-table tbody');
+
+const adminInfoDiv = document.getElementById('admin-info');
+const activeAdminsDiv = document.getElementById('active-admins');
 const superadminSection = document.getElementById('superadmin-section');
+const superadminHeader = document.getElementById('superadmin-toggle-header');
+const superadminContent = document.getElementById('superadmin-content');
+const superadminBtn = document.getElementById('btn-toggle-superadmin');
+
+if (superadminHeader) {
+    superadminHeader.addEventListener('click', () => {
+        if (superadminContent.style.display === 'none') {
+            superadminContent.style.display = 'block';
+            superadminBtn.innerHTML = '🔼 Chiudi Pannello';
+        } else {
+            superadminContent.style.display = 'none';
+            superadminBtn.innerHTML = '🔽 Apri Pannello';
+        }
+    });
+}
 const superadminTbody = document.querySelector('#superadmin-table tbody');
 const adminInfo = document.getElementById('admin-info');
 
@@ -108,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 3. UI Execution state
                 if (isSuper) {
                     currentAdminUser.superadmin = true;
+                    // Mostra la sezione se ha i permessi per vederla
                     if (superadminSection) {
                         superadminSection.style.display = 'block';
                     }
