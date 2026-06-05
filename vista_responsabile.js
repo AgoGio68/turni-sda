@@ -437,6 +437,10 @@ document.addEventListener('DOMContentLoaded', () => {
           const eq = turno.equipaggio_attuale || {};
           const req = turno.requisiti_equipaggio || {};
           
+          let stato = turno.stato_turno || 'APERTO';
+          const inizioTurno = turno.orario?.inizio || "00:00";
+          const fineTurno = turno.orario?.fine || "00:00";
+          
           const formatCell = (assegnazioni, richiesto, roleKey) => {
               if (assegnazioni && assegnazioni.length > 0) {
                   let html = '';
@@ -478,6 +482,16 @@ document.addEventListener('DOMContentLoaded', () => {
                           <span style="font-size:0.75rem; color:var(--text-muted);">${membro.inizio}-${membro.fine}</span> ${statusHtml}
                       </div>`;
                   });
+
+                  const buchi = calcolaBuchiRuolo(assegnazioni, inizioTurno, fineTurno);
+                  if (buchi.length > 0) {
+                      buchi.forEach(b => {
+                          html += `<div style="color: var(--neon-orange); font-size: 0.75rem; margin-top: 0.3rem; border: 1px dashed var(--neon-orange); padding: 2px; border-radius: 4px; text-align: center; background: rgba(255, 165, 0, 0.1);">
+                            ⚠️ Scoperto: ${b.inizio}-${b.fine}
+                          </div>`;
+                      });
+                  }
+
                   return html;
               }
               if (!richiesto) return `<em style="color:var(--text-muted); font-size: 0.85rem; opacity: 0.5;">N.D.</em>`;
@@ -488,10 +502,6 @@ document.addEventListener('DOMContentLoaded', () => {
               return `<em style="color:var(--neon-red); font-size: 0.85rem;">Vuoto</em>${btnDestHtml}`;
           };
 
-          let stato = turno.stato_turno || 'APERTO';
-          const inizioTurno = turno.orario?.inizio || "00:00";
-          const fineTurno = turno.orario?.fine || "00:00";
-          
           const autistaFull = !req.autista_richiesto || calcolaCoperturaRuolo(eq.autista, inizioTurno, fineTurno).isFull;
           const referenteFull = !req.referente_richiesto || calcolaCoperturaRuolo(eq.referente_soreu, inizioTurno, fineTurno).isFull;
           const soccorritoreFull = !req.soccorritore_richiesto || calcolaCoperturaRuolo(eq.soccorritore, inizioTurno, fineTurno).isFull;
