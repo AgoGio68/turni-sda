@@ -85,14 +85,14 @@ export function validaRiposi(nuovoTurnoData, orarioInizio, orarioFine, turniEsis
 
         if (shiftEnd <= tStart) {
             const oreRiposo = (tStart - shiftEnd) / MILLISECONDS_IN_HOUR;
-            if (oreRiposo > 0 && oreRiposo < MIN_RIPOSO_ORE) {
+            if (oreRiposo >= 0 && oreRiposo < MIN_RIPOSO_ORE) {
                 return { idoneo: false, motivo: `Riposo insufficiente: garantite solo ${oreRiposo.toFixed(1)}h prima del turno successivo (minimo richiesto: ${MIN_RIPOSO_ORE}h).` };
             }
         }
         
         if (shiftStart >= tEnd) {
             const oreRiposo = (shiftStart - tEnd) / MILLISECONDS_IN_HOUR;
-            if (oreRiposo > 0 && oreRiposo < MIN_RIPOSO_ORE) {
+            if (oreRiposo >= 0 && oreRiposo < MIN_RIPOSO_ORE) {
                 return { idoneo: false, motivo: `Riposo insufficiente: riposo di solo ${oreRiposo.toFixed(1)}h dal turno precedente (minimo richiesto: ${MIN_RIPOSO_ORE}h).` };
             }
         }
