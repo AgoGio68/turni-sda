@@ -24,10 +24,13 @@ async function runDeploy() {
     
     let versione = "Sconosciuta";
     try {
-        const data = JSON.parse(fs.readFileSync('./versione_app.json', 'utf8'));
-        versione = data.versione;
+        const indexHtml = fs.readFileSync('./index.html', 'utf8');
+        const match = indexHtml.match(/Ver\. ([\d\.]+)/);
+        if (match) {
+            versione = match[1];
+        }
     } catch(e) {
-        console.log("Errore nella lettura di versione_app.json");
+        console.log("Errore nella lettura della versione da index.html");
     }
 
     console.log(`Versione rilevata nei file: ${versione}\n`);
@@ -36,7 +39,7 @@ async function runDeploy() {
     const q1 = await askQuestion("Confermi che questa è la versione corretta che vuoi mandare in produzione e registrare su GitHub? (SÌ/NO): ");
     
     if (!isAffirmative(q1)) {
-        console.log("\n❌ Modifica il file versione_app.json con la nuova versione prima di lanciare nuovamente il deploy.");
+        console.log("\n❌ Modifica il file index.html con la nuova versione prima di lanciare nuovamente il deploy.");
         rl.close();
         process.exit(1);
     }
