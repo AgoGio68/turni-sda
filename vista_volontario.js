@@ -918,6 +918,21 @@ document.addEventListener('DOMContentLoaded', () => {
           if (typeof startVolunteerMessagingListener === 'function') {
               startVolunteerMessagingListener(currentUser.matricola);
           }
+          
+          // Richiedi permessi e registra token per le notifiche push del volontario
+          if (window.AppMessaging && window.AppMessaging.requestNotificationPermissions) {
+              window.AppMessaging.requestNotificationPermissions(currentUser.matricola);
+              window.AppMessaging.listenInForeground();
+          } else {
+              const checkMsg = setInterval(() => {
+                  if (window.AppMessaging && window.AppMessaging.requestNotificationPermissions) {
+                      window.AppMessaging.requestNotificationPermissions(currentUser.matricola);
+                      window.AppMessaging.listenInForeground();
+                      clearInterval(checkMsg);
+                  }
+              }, 500);
+              setTimeout(() => clearInterval(checkMsg), 10000);
+          }
         } else {
           alert("Profilo volontario non trovato nel database.");
           signOut(auth);

@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "turni-sda"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

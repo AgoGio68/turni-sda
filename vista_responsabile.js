@@ -103,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
             superadminSection.style.display = 'block';
             initSuperadminPanel();
             initApp();
+            registerAdminNotifications('agogio');
         } else {
             // Controllo Admin normale (Volontario con is_admin: true)
             const snap = await getDoc(doc(db, "utenti", matricola));
@@ -146,6 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 initApp();
                 initPresence();
+                registerAdminNotifications(currentAdminUser.matricola);
             } else {
                 console.error("Accesso negato: Permessi non sufficienti per la matricola", matricola);
                 alert("Accesso negato: non hai i permessi di amministratore per questa vista.");
@@ -159,6 +161,23 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error("Errore in onAuthStateChanged Responsabile:", e.code, e.message);
     }
   });
+
+  function registerAdminNotifications(matricola) {
+      if (!matricola) return;
+      if (window.AppMessaging && window.AppMessaging.requestNotificationPermissions) {
+          window.AppMessaging.requestNotificationPermissions(matricola);
+          window.AppMessaging.listenInForeground();
+      } else {
+          const checkMsg = setInterval(() => {
+              if (window.AppMessaging && window.AppMessaging.requestNotificationPermissions) {
+                  window.AppMessaging.requestNotificationPermissions(matricola);
+                  window.AppMessaging.listenInForeground();
+                  clearInterval(checkMsg);
+              }
+          }, 500);
+          setTimeout(() => clearInterval(checkMsg), 10000);
+      }
+  }
   
   // 1.5. Presenza Live Admin
   function initPresence() {
@@ -335,6 +354,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         <input type="checkbox" id="toggle-regola-admin" style="transform: scale(1.2); cursor: pointer;">
                     </div>
                 </div>
+                <div style="padding: 15px; background: rgba(255, 255, 255, 0.03); border: 1px solid #ff0055; border-radius: 8px; margin-top: 15px;">
+                    <h4 style="color: #ff0055; margin: 0 0 10px 0; font-size: 1rem; text-transform: uppercase;">⚠️ Area Pericolosa (Solo Test)</h4>
+                    <p style="font-size: 0.8rem; color: #aaa; margin: 0 0 12px 0;">Cancella in modo permanente tutti i dati dei turni o lo storico dei messaggi. Operazione non annullabile.</p>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn" id="btn-svuota-turni" style="border-color: #ff0055; color: #ff0055; background: rgba(255,0,85,0.1); padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 4px; cursor: pointer;">Svuota Tutti i Turni</button>
+                        <button class="btn" id="btn-svuota-comunicazioni" style="border-color: #ff0055; color: #ff0055; background: rgba(255,0,85,0.1); padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 4px; cursor: pointer;">Svuota Storico Messaggi</button>
+                    </div>
+                </div>
               `;
           }
 
@@ -342,6 +369,8 @@ document.addEventListener('DOMContentLoaded', () => {
           const toggleVolontari = document.getElementById('toggle-riposo-volontari');
           const toggleDipendenti = document.getElementById('toggle-riposo-dipendenti');
           const toggleRegoleAdmin = document.getElementById('toggle-regola-admin');
+          const btnSvuotaTurni = document.getElementById('btn-svuota-turni');
+          const btnSvuotaComunicazioni = document.getElementById('btn-svuota-comunicazioni');
 
           if (toggleVolontari && toggleDipendenti && toggleRegoleAdmin) {
               if (activeUnsubscribes.regole_riposo) activeUnsubscribes.regole_riposo();
@@ -383,6 +412,48 @@ document.addEventListener('DOMContentLoaded', () => {
               toggleRegoleAdmin.addEventListener('change', updateRules);
           } else {
               console.warn("[SUPERADMIN] Toggle elements not found after innerHTML inject. Check #superadmin-rules-panel.");
+          }
+
+          if (btnSvuotaTurni) {
+              btnSvuotaTurni.addEventListener('click', async () => {
+                  if (!confirm("⚠️ ATTENZIONE! Questa operazione CANCELLERÀ TUTTI I TURNI presenti nel database. Vuoi procedere?")) return;
+                  if (!confirm("Sei ASSOLUTAMENTE sicuro? Questa operazione è irreversibile e cancellerà definitivamente tutti i turni.")) return;
+                  
+                  try {
+                      btnSvuotaTurni.disabled = true;
+                      btnSvuotaTurni.innerHTML = "Eliminazione...";
+                      const snap = await getDocs(collection(db, "turni"));
+                      await Promise.all(snap.docs.map(docSnap => deleteDoc(docSnap.ref)));
+                      alert("Tutti i turni sono stati cancellati dal database!");
+                  } catch (err) {
+                      console.error("Errore svuotamento turni:", err);
+                      alert("Errore durante lo svuotamento: " + err.message);
+                  } finally {
+                      btnSvuotaTurni.disabled = false;
+                      btnSvuotaTurni.innerHTML = "Svuota Tutti i Turni";
+                  }
+              });
+          }
+
+          if (btnSvuotaComunicazioni) {
+              btnSvuotaComunicazioni.addEventListener('click', async () => {
+                  if (!confirm("⚠️ ATTENZIONE! Questa operazione CANCELLERÀ TUTTO LO STORICO MESSAGGI e comunicazioni. Vuoi procedere?")) return;
+                  if (!confirm("Sei ASSOLUTAMENTE sicuro? I messaggi andranno persi per sempre.")) return;
+                  
+                  try {
+                      btnSvuotaComunicazioni.disabled = true;
+                      btnSvuotaComunicazioni.innerHTML = "Eliminazione...";
+                      const snap = await getDocs(collection(db, "comunicazioni_turni"));
+                      await Promise.all(snap.docs.map(docSnap => deleteDoc(docSnap.ref)));
+                      alert("Lo storico comunicazioni è stato svuotato!");
+                  } catch (err) {
+                      console.error("Errore svuotamento comunicazioni:", err);
+                      alert("Errore durante lo svuotamento: " + err.message);
+                  } finally {
+                      btnSvuotaComunicazioni.disabled = false;
+                      btnSvuotaComunicazioni.innerHTML = "Svuota Storico Messaggi";
+                  }
+              });
           }
       } else {
           // Non-destructive hide: preserve node in DOM to prevent null crashes on re-render cycles
@@ -1489,11 +1560,4 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 });
 
-// Append strictly at the end of the script configuration initialization:
-document.addEventListener("DOMContentLoaded", () => {
-    if (window.AppMessaging && window.AppMessaging.requestNotificationPermissions) {
-        const userMatricola = window.currentLoggedUserMatricola || "34";
-        window.AppMessaging.requestNotificationPermissions(userMatricola);
-        window.AppMessaging.listenInForeground();
-    }
-});
+

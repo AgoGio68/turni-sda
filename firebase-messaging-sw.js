@@ -14,16 +14,7 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
     console.log("[SW_BACKGROUND] Ricevuta notifica push in background:", payload);
-    const notificationTitle = payload.data?.title || payload.notification?.title || "Avviso Urgente Turni";
-    const notificationOptions = {
-        body: payload.data?.body || payload.notification?.body || "Controlla le ultime variazioni sul tabellone.",
-        icon: "assets/icons/icon-192x192.png",
-        badge: "assets/icons/icon-72x72.png",
-        sound: "assets/audio/alarm.mp3",
-        tag: "urgente-servizio",
-        renotify: true
-    };
-    return self.registration.showNotification(notificationTitle, notificationOptions);
+    // Nessuna azione manuale: delegato interamente al sistema operativo
 });
 
 self.addEventListener("notificationclick", (event) => {

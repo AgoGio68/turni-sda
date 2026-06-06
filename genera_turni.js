@@ -9,18 +9,11 @@ const db = getFirestore();
 const slotVuoto = { matricola: null, nominativo: null, convalidato_da_admin: false };
 
 async function run() {
-    console.log("Inizio generazione nuovi turni...");
+    console.log("=== INIZIO GENERAZIONE TURNI TEST (10 GIU - 31 LUG 2026) ===");
 
-    // 1. Elimino i vecchi turni dal giorno corrente in poi
-    const startDate = new Date();
-    startDate.setHours(0,0,0,0);
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + 2); // Genera per i prossimi 2 mesi
-
-    const dataStartStr = startDate.toISOString().split('T')[0];
-    console.log(`Eliminazione turni vecchi a partire dal ${dataStartStr}...`);
-    
-    const oldShifts = await db.collection('turni').where('data', '>=', dataStartStr).get();
+    // 1. Elimina TUTTI i turni esistenti prima di caricare i nuovi
+    console.log("Eliminazione di eventuali turni vecchi...");
+    const oldShifts = await db.collection('turni').get();
     let batch = db.batch();
     let ops = 0;
     
@@ -32,7 +25,8 @@ async function run() {
     if(ops > 0) { await batch.commit(); }
     console.log(`Cancellati ${oldShifts.docs.length} turni obsoleti.`);
 
-    console.log("Generazione nuovi turni con struttura 118 dinamica...");
+    // 2. Generazione turni
+    console.log("Generazione nuovi turni vuoti per i test...");
     batch = db.batch();
     ops = 0;
     let creati = 0;
@@ -44,15 +38,17 @@ async function run() {
         allievo_quarto_posto: {...slotVuoto} 
     });
 
+    const startDate = new Date('2026-06-10T00:00:00');
+    const endDate = new Date('2026-07-31T23:59:59');
+
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
         const yyyy = d.getFullYear();
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const dd = String(d.getDate()).padStart(2, '0');
         const dataStr = `${yyyy}-${mm}-${dd}`;
         const dayOfWeek = d.getDay(); // 0=Dom ... 6=Sab
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-        // CALCOLO FASCE 118
+        // Calcolo fasce 118 (coerente con la struttura dell'Associazione)
         let fasce = [];
         if (dayOfWeek >= 1 && dayOfWeek <= 4) {
             fasce = [
@@ -97,15 +93,14 @@ async function run() {
             ops++; creati++;
             if(ops === 400) { await batch.commit(); batch = db.batch(); ops = 0; }
         }
-
-        // I turni di Trasporto Sanitario sono stati rimossi su richiesta.
-
-
     }
 
     if(ops > 0) { await batch.commit(); }
-    console.log(`✅ SUCCESSO! Generati ${creati} nuovi turni correttamente.`);
+    console.log(`✅ SUCCESSO! Generati ${creati} nuovi turni vuoti per il periodo 10 Giu - 31 Lug.`);
     process.exit(0);
 }
 
-run();
+run().catch(err => {
+    console.error("Errore durante la generazione:", err);
+    process.exit(1);
+});
