@@ -18,12 +18,31 @@
 </head>
 <body>
   <header>
-    <h1>⚙️ Gestione Turni & Equipaggi</h1>
+    <div style="display: flex; align-items: center;">
+        <h1 style="margin: 0;">⚙️ Gestione Turni & Equipaggi</h1>
+        <!-- Notification Badge Trigger -->
+        <div id="messaging-badge-container" style="position: relative; cursor: pointer; display: inline-block; margin: 0 15px; vertical-align: middle;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-bell" style="color: #00ffcc;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span id="msg-unread-count" style="display: none; position: absolute; top: -5px; right: -5px; background: #ff0055; color: white; border-radius: 50%; padding: 2px 6px; font-size: 10px; font-weight: bold; box-shadow: 0 0 8px #ff0055;">0</span>
+        </div>
+    </div>
     <div style="text-align: right;">
         <div id="admin-info" style="font-weight: 500; color: var(--primary-neon);">Admin: Autenticazione in corso...</div>
         <div id="active-admins" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;"></div>
     </div>
   </header>
+
+<!-- Glassmorphic Slide-out Panel for Messages -->
+<div id="messaging-panel" style="display: none; position: fixed; top: 0; right: 0; width: 350px; height: 100vh; background: rgba(20, 20, 25, 0.85); backdrop-filter: blur(12px); box-shadow: -5px 0 25px rgba(0,0,0,0.5); z-index: 9999; padding: 20px; box-sizing: border-box; font-family: sans-serif; color: #fff; border-left: 1px solid rgba(255,255,255,0.15);">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 15px;">
+        <h3 style="margin: 0; color: #00ffcc; font-size: 18px;">Comunicazioni Servizio</h3>
+        <button id="close-messaging-panel" style="background: transparent; border: none; color: #aaa; font-size: 20px; cursor: pointer;">&times;</button>
+    </div>
+    <div id="messaging-list-container" style="height: calc(100vh - 100px); overflow-y: auto; padding-right: 5px;">
+        <!-- Dynamic items will land here -->
+        <p style="color: #888; text-align: center; margin-top: 50px;">Nessun messaggio presente.</p>
+    </div>
+</div>
   <div id="move-banner" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(255, 165, 0, 0.9); border: 2px solid var(--neon-orange); padding: 1rem 2rem; border-radius: 8px; z-index: 1000; box-shadow: 0 0 15px rgba(255, 165, 0, 0.5); backdrop-filter: blur(10px); color: #fff; font-weight: bold; text-align: center; max-width: 90vw;">
     <span style="font-size: 1.2rem;">🔄 Stai spostando <span id="move-banner-name" style="color: #fff; text-decoration: underline;">NOME</span> dal turno del <span id="move-banner-date" style="color: #fff;">DATA</span>.</span><br>
     <span style="font-size: 0.95rem; opacity: 0.9;">Clicca sul tasto 'Spos.' del turno di destinazione per incollarlo, oppure</span>
@@ -177,5 +196,6 @@
   </div>
 
   <script type="module" src="vista_responsabile.js?v=1.8.8"></script>
+    <script type="module" src="messaging_service.js"></script>
 </body>
 </html>
