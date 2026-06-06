@@ -1354,6 +1354,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const resultsContainer = document.getElementById("msg-search-results");
     const sendBtn = document.getElementById("send-msg-btn");
     const textInput = document.getElementById("msg-text-input");
+    const templateSelect = document.getElementById("msg-template-select");
+    const soundToggle = document.getElementById("msg-urgent-sound-toggle");
 
     let selectedMatricola = null;
 
@@ -1424,8 +1426,19 @@ document.addEventListener("DOMContentLoaded", () => {
     // Updated Submission Execution
     if (sendBtn) {
         sendBtn.addEventListener("click", async () => {
-            const testo = textInput.value.trim();
-            if (!testo) { alert("Il testo del messaggio è vuoto."); return; }
+            let testoCorpo = textInput.value.trim();
+            const templateSelezionato = templateSelect ? templateSelect.value : "CUSTOM";
+            const riproduciSuono = soundToggle ? soundToggle.checked : true;
+            
+            if (templateSelezionato !== "CUSTOM") {
+                const opzioneSelezionata = templateSelect.options[templateSelect.selectedIndex].text;
+                testoCorpo = opzioneSelezionata + "\n\n" + testoCorpo;
+            }
+
+            if (!testoCorpo && templateSelezionato === "CUSTOM") { 
+                alert("Il testo del messaggio è vuoto."); 
+                return; 
+            }
 
             let destinatario = "ALL";
             
@@ -1443,16 +1456,27 @@ document.addEventListener("DOMContentLoaded", () => {
             sendBtn.textContent = "Invio in corso...";
 
             if (window.AppMessaging && window.AppMessaging.sendMessage) {
-                const response = await window.AppMessaging.sendMessage(mittente, destinatario, testo, "comunicazione_generica");
+                const response = await window.AppMessaging.sendMessage(
+                    mittente, 
+                    destinatario, 
+                    testoCorpo, 
+                    templateSelezionato === "EMERGENZA" ? "critico" : "comunicazione_generica",
+                    {
+                        richiede_notifica_push: true,
+                        urgente: true,
+                        suono: riproduciSuono ? "alarm.mp3" : "default",
+                        titolo_notifica: templateSelezionato !== "CUSTOM" ? "Avviso Urgente Associazione" : "Nuovo Messaggio di Servizio"
+                    }
+                );
 
                 sendBtn.disabled = false;
                 sendBtn.textContent = "Invia Messaggio";
 
                 if (response.success) {
                     textInput.value = "";
-                    searchInput.value = "";
+                    if (searchInput) searchInput.value = "";
                     selectedMatricola = null;
-                    alert("Messaggio inviato con successo!");
+                    alert("Messaggio e Notifica Push inoltrati con successo!");
                 } else {
                     alert("Errore nell'invio: " + (response.error || "Sconosciuto"));
                 }

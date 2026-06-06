@@ -54,6 +54,22 @@
             </div>
         </div>
         <div style="margin-bottom: 8px;">
+            <label style="font-size: 11px; color: #00ffcc; display: block; margin-bottom: 4px;">Tipo di Avviso / Template:</label>
+            <select id="msg-template-select" style="width: 100%; background: #1a1a24; color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 4px; font-size: 12px; outline: none;">
+                <option value="CUSTOM">Testo Libero (Nessun Template)</option>
+                <option value="ALERT_TURNO">⚠️ ALERT SERVIZIO: Copertura turno urgente.</option>
+                <option value="NOTIFICA_DIR">📢 NOTIFICA DIREZIONE: Variazione urgente.</option>
+                <option value="EMERGENZA">🚨 EMERGENZA: Convocazione straordinaria.</option>
+                <option value="PROMEMORIA">📝 PROMEMORIA: Turno in imminente inizio.</option>
+            </select>
+        </div>
+
+        <div style="margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+            <label style="font-size: 11px; color: #ff0055; font-weight: bold;">Notifica Urgente con Suono (Sveglia Telefono):</label>
+            <input type="checkbox" id="msg-urgent-sound-toggle" checked style="cursor: pointer; accent-color: #ff0055;">
+        </div>
+
+        <div style="margin-bottom: 8px;">
             <label style="font-size: 11px; color: #00ffcc; display: block; margin-bottom: 4px;">Testo Messaggio:</label>
             <textarea id="msg-text-input" rows="2" placeholder="Scrivi una comunicazione..." style="width: 100%; background: #1a1a24; color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 6px; font-size: 12px; resize: none; outline: none; box-sizing: border-box;"></textarea>
         </div>
@@ -217,7 +233,7 @@
     </div>
   </div>
 
-  <script type="module" src="vista_responsabile.js?v=1.8.8"></script>
+  <script type="module" src="vista_responsabile.js?v=1.8.9"></script>
     <script type="module" src="messaging_service.js"></script>
 </body>
 </html>

@@ -20,7 +20,7 @@ try {
 
 window.AppMessaging = {
     // A. Send a message using a standard root collection (gestione-corso120 style)
-    sendMessage: async (mittente, destinatario, testo, tipo = "comunicazione_generica") => {
+    sendMessage: async (mittente, destinatario, testo, tipo = "comunicazione_generica", parametri_push = null) => {
         if (!testo || !String(testo).trim()) return { success: false, error: "Testo vuoto" };
         
         try {
@@ -32,6 +32,10 @@ window.AppMessaging = {
                 timestamp: new Date().toISOString(),
                 letto: false
             };
+            
+            if (parametri_push) {
+                payload.parametri_push = parametri_push;
+            }
             
             const docRef = await addDoc(collection(db, "comunicazioni_turni"), payload);
             console.log(`[MESSAGING] Messaggio inviato con ID: ${docRef.id}`);
