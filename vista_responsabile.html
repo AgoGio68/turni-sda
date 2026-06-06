@@ -47,7 +47,11 @@
                 <option value="ALL">Tutti i Volontari (ALL)</option>
                 <option value="SINGLE">Singolo Volontario (scrivi sotto)</option>
             </select>
-            <input id="msg-search-input" type="text" placeholder="Scrivi Cognome o Nome..." style="display: none; width: 100%; background: #1a1a24; color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 6px; font-size: 12px; outline: none; box-sizing: border-box;">
+            <div style="position: relative;">
+                <input id="msg-search-input" type="text" placeholder="Inizia a digitare Cognome o Nome..." style="display: none; width: 100%; background: #1a1a24; color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 6px; font-size: 12px; outline: none; box-sizing: border-box;">
+                <!-- Live Results Dropdown -->
+                <div id="msg-search-results" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 150px; overflow-y: auto; background: #1a1a24; border: 1px solid rgba(255,255,255,0.15); border-top: none; border-radius: 0 0 4px 4px; z-index: 10000; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"></div>
+            </div>
         </div>
         <div style="margin-bottom: 8px;">
             <label style="font-size: 11px; color: #00ffcc; display: block; margin-bottom: 4px;">Testo Messaggio:</label>

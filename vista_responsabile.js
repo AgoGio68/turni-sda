@@ -1351,15 +1351,77 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const typeSelect = document.getElementById("msg-type-select");
     const searchInput = document.getElementById("msg-search-input");
+    const resultsContainer = document.getElementById("msg-search-results");
     const sendBtn = document.getElementById("send-msg-btn");
     const textInput = document.getElementById("msg-text-input");
 
+    let selectedMatricola = null;
+
     if (typeSelect && searchInput) {
         typeSelect.addEventListener("change", () => {
-            searchInput.style.display = typeSelect.value === "SINGLE" ? "block" : "none";
+            const isSingle = typeSelect.value === "SINGLE";
+            searchInput.style.display = isSingle ? "block" : "none";
+            if (!isSingle) {
+                if (resultsContainer) resultsContainer.style.display = "none";
+                selectedMatricola = null;
+                searchInput.value = "";
+            }
         });
     }
 
+    // Live Filtering on Keydown/Input
+    if (searchInput && resultsContainer) {
+        searchInput.addEventListener("input", () => {
+            const query = searchInput.value.trim().toLowerCase();
+            if (!query) {
+                resultsContainer.style.display = "none";
+                return;
+            }
+
+            // Access available global volunteer data arrays
+            const arrayVolontari = window.listaUtenti || window.volontari || window.globalVolontari || Object.values(window.globalUsersMap || {});
+            
+            // Filter elements matching name or surname
+            const filtered = arrayVolontari.filter(v => 
+                String(v.cognome || '').toLowerCase().includes(query) || 
+                String(v.nome || '').toLowerCase().includes(query)
+            );
+
+            if (filtered.length === 0) {
+                resultsContainer.innerHTML = '<div style="padding: 8px; color: #888; font-size: 12px;">Nessun volontario trovato</div>';
+                resultsContainer.style.display = "block";
+                return;
+            }
+
+            // Render matching rows
+            resultsContainer.innerHTML = filtered.map(v => `
+                <div class="suggest-item" data-id="${String(v.matricola).trim()}" data-fullname="${v.cognome || ''} ${v.nome || ''}" style="padding: 8px; cursor: pointer; font-size: 12px; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;">
+                    ${v.cognome || ''} ${v.nome || ''} <span style="color: #00ffcc; font-size: 10px; float: right;">Matr. ${v.matricola}</span>
+                </div>
+            `).join('');
+
+            resultsContainer.style.display = "block";
+
+            // Bind click event to rows
+            resultsContainer.querySelectorAll(".suggest-item").forEach(item => {
+                item.addEventListener("click", () => {
+                    selectedMatricola = item.getAttribute("data-id");
+                    searchInput.value = item.getAttribute("data-fullname");
+                    resultsContainer.style.display = "none";
+                    console.log(`[MESSAGING_UI] Selezionato utente: ${searchInput.value} (Matr. ${selectedMatricola})`);
+                });
+            });
+        });
+
+        // Close list if user clicks outside
+        document.addEventListener("click", (e) => {
+            if (e.target !== searchInput && e.target !== resultsContainer) {
+                resultsContainer.style.display = "none";
+            }
+        });
+    }
+
+    // Updated Submission Execution
     if (sendBtn) {
         sendBtn.addEventListener("click", async () => {
             const testo = textInput.value.trim();
@@ -1368,23 +1430,11 @@ document.addEventListener("DOMContentLoaded", () => {
             let destinatario = "ALL";
             
             if (typeSelect.value === "SINGLE") {
-                const ricerca = searchInput.value.trim().toLowerCase();
-                if (!ricerca) { alert("Inserisci il nome o cognome del volontario."); return; }
-
-                // Dynamic scan of any existing data array in memory
-                const arrayVolontari = window.listaUtenti || window.volontari || window.globalVolontari || Object.values(window.globalUsersMap || {});
-                const trovato = arrayVolontari.find(v => 
-                    String(v.cognome || '').toLowerCase().includes(ricerca) || 
-                    String(v.nome || '').toLowerCase().includes(ricerca)
-                );
-
-                if (!trovato || !trovato.matricola) {
-                    alert(`Nessun volontario trovato corrispondente a: "${ricerca}". Riprova.`);
+                if (!selectedMatricola) {
+                    alert("Seleziona un volontario valido cliccando tra i suggerimenti che appaiono mentre digiti.");
                     return;
                 }
-                
-                destinatario = String(trovato.matricola).trim();
-                console.log(`[MESSAGING] Match trovato: ${trovato.cognome} ${trovato.nome} -> Matr. ${destinatario}`);
+                destinatario = selectedMatricola;
             }
 
             const mittente = window.currentLoggedUserMatricola || "34";
@@ -1401,6 +1451,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (response.success) {
                     textInput.value = "";
                     searchInput.value = "";
+                    selectedMatricola = null;
                     alert("Messaggio inviato con successo!");
                 } else {
                     alert("Errore nell'invio: " + (response.error || "Sconosciuto"));
