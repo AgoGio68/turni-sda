@@ -20,8 +20,8 @@ try {
   console.error("Firebase init error in messaging_service:", e);
 }
 
-// Inserisci qui la chiave VAPID estratta dalle impostazioni di Cloud Messaging se vuoi registrare i token
-const VAPID_KEY = "CHIAVE_VAPID_DEFAULTS_DA_CONSOLE_SE_GENERATA";
+// Chiave Web Push ufficiale estratta per il progetto turni-sda
+const VAPID_KEY = "BM-3y_j5nJT7RUtme99iIAA7pb3zzFdSEBTJPoHNsymq7neo-mrEcoMvnzAMkmRKDLO9n1Pr2KigiDg8YWyawaw";
 
 window.AppMessaging = {
     sendMessage: async (mittente, destinatario, testo, tipo = "comunicazione_generica", opzioniPush = {}) => {
@@ -75,27 +75,39 @@ window.AppMessaging = {
         try {
             const permission = await Notification.requestPermission();
             if (permission === "granted") {
-                const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY }).catch((e) => {
-                    console.warn("[FCM] Impossibile recuperare il token (manca VAPID key o configurazione HTTPS):", e);
-                    return null;
-                });
-                if (currentToken) {
-                    await setDoc(doc(db, "dispositivi_notifiche", String(matricolaUtente).trim()), {
-                        token_fcm: currentToken,
-                        ultimo_aggiornamento: new Date().toISOString(),
-                        piattaforma: "web_browser"
-                    }, { merge: true });
-                    console.log("[FCM] Token registrato correttamente per la matricola:", matricolaUtente);
+                // Registra esplicitamente il Service Worker di background
+                const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js").catch(() => null);
+                
+                if (registration) {
+                    // Timeout di sicurezza per permettere lo stato attivo del Service Worker
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    const currentToken = await getToken(messaging, { 
+                        vapidKey: VAPID_KEY,
+                        serviceWorkerRegistration: registration 
+                    }).catch((e) => {
+                        console.warn("[FCM] Errore sottoscrizione token:", e);
+                        return null;
+                    });
+
+                    if (currentToken) {
+                        await setDoc(doc(db, "dispositivi_notifiche", String(matricolaUtente).trim()), {
+                            token_fcm: currentToken,
+                            ultimo_aggiornamento: new Date().toISOString(),
+                            piattaforma: "web_browser"
+                        }, { merge: true });
+                        console.log("[FCM] Sincronizzazione completata con successo per la matricola:", matricolaUtente);
+                    }
                 }
             }
-        } catch (err) { console.error("Errore permessi push:", err); }
+        } catch (err) { console.error("Errore setup notifiche:", err); }
     },
 
     listenInForeground: () => {
         if (!messaging) return;
         onMessage(messaging, (payload) => {
             const audio = new Audio("assets/audio/alarm.mp3");
-            audio.play().catch(() => console.log("Riproduzione audio bloccata dalle policy del browser. Serve un click."));
+            audio.play().catch(() => console.log("Audio in primo piano condizionato dalle interazioni utente."));
             alert(`🚨 ${payload.notification?.title || 'AVVISO URGENTE'}\n\n${payload.notification?.body || payload.data?.body || ''}`);
         });
     }
