@@ -91,8 +91,8 @@ window.AppMessaging = {
                     });
 
                     if (currentToken) {
-                        await setDoc(doc(db, "dispositivi_notifiche", String(matricolaUtente).trim()), {
-                            token_fcm: currentToken,
+                        await setDoc(doc(db, "dispositivi_notifiche", String(currentToken).trim()), {
+                            matricola: String(matricolaUtente).trim(),
                             ultimo_aggiornamento: new Date().toISOString(),
                             piattaforma: "web_browser"
                         }, { merge: true });

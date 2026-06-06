@@ -32,10 +32,24 @@ exports.inviaNotificaPushEmergenza = onDocumentCreated("comunicazioni_turni/{idM
             // Invia a tutti i dispositivi registrati
             const snapshotDispositivi = await admin.firestore().collection("dispositivi_notifiche").get();
             snapshotDispositivi.forEach(doc => {
-                if (doc.data().token_fcm) tokens.push(doc.data().token_fcm);
+                const data = doc.data();
+                if (data.token_fcm) {
+                    tokens.push(data.token_fcm);
+                } else {
+                    tokens.push(doc.id);
+                }
             });
         } else {
-            // Recupera il token specifico della matricola destinataria
+            // 1. Cerca i dispositivi registrati col nuovo formato (ID documento = token, matricola come campo)
+            const snapshotDispositivi = await admin.firestore()
+                .collection("dispositivi_notifiche")
+                .where("matricola", "==", destinatario)
+                .get();
+            snapshotDispositivi.forEach(doc => {
+                tokens.push(doc.id);
+            });
+
+            // 2. Compatibilità con il vecchio formato (ID documento = matricola, token_fcm come campo)
             const docDispositivo = await admin.firestore().collection("dispositivi_notifiche").doc(destinatario).get();
             if (docDispositivo.exists && docDispositivo.data().token_fcm) {
                 tokens.push(docDispositivo.data().token_fcm);
