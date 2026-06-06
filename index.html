@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Turni SDA - Login</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Turni SDA">
+  <link rel="apple-touch-icon" href="assets/app_icon.png">
 
   <script type="importmap">
   {
@@ -70,6 +75,22 @@
   </style>
 </head>
 <body>
+  <!-- Banner d'installazione PWA per utenti iOS Safari -->
+  <div id="ios-pwa-banner" style="display: none; width: 100%; max-width: 400px; margin: 0 auto 1.5rem auto; background: linear-gradient(135deg, rgba(255, 153, 0, 0.15) 0%, rgba(255, 7, 58, 0.1) 100%); border: 1px solid rgba(255, 153, 0, 0.3); border-radius: var(--radius); padding: 1.25rem; box-sizing: border-box; text-align: left; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);">
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+      <span style="font-size: 1.5rem;">📱</span>
+      <h3 style="color: var(--neon-orange); margin: 0; font-size: 1.1rem; font-weight: bold; letter-spacing: 0.5px;">Installa Turni SDA</h3>
+    </div>
+    <p style="color: var(--text-main); font-size: 0.85rem; line-height: 1.5; margin: 0 0 1rem 0;">
+      Per poter ricevere le <strong>notifiche push sul cellulare</strong> (suoni e avvisi di chiamata), devi installare l'applicazione sulla schermata Home:
+    </p>
+    <ol style="color: var(--text-main); font-size: 0.85rem; line-height: 1.6; margin: 0; padding-left: 1.25rem;">
+      <li style="margin-bottom: 0.5rem;">Premi il pulsante di <strong>Condividi</strong> (il quadrato con la freccia verso l'alto <span style="font-size: 1.1rem; vertical-align: middle;">📤</span> in fondo allo schermo).</li>
+      <li style="margin-bottom: 0.5rem;">Scorri l'elenco e seleziona <strong>"Aggiungi alla schermata Home"</strong>.</li>
+      <li>Apri l'app dall'icona creata sulla schermata Home ed effettua il login per abilitare i permessi.</li>
+    </ol>
+  </div>
+
   <div class="login-container glass-panel">
     <h1 style="color: var(--primary-neon); margin:0;">🚨 Turni SDA</h1>
     <p style="color: var(--text-muted); margin-top: 0.5rem;">Accesso Volontari e Operatori</p>
@@ -85,7 +106,7 @@
       <button id="btn-open-guide" class="btn" type="button" style="width: 100%; padding: 0.8rem; font-size: 0.95rem; background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid var(--border-glass); margin-top: -0.5rem;">📖 Guida Applicazione</button>
       <p id="login-error" style="color: var(--neon-red); font-size: 0.85rem; height: 1rem;"></p>
           <!-- NOTA PER LO SVILUPPO: AGGIORNARE LA VERSIONE SOLO ED ESCLUSIVAMENTE QUI. QUESTA E' L'UNICA FONTE DI VERITA' -->
-          <div id="app-version-label" style="font-size: 0.75rem; color: var(--neon-orange); font-weight: bold; background: rgba(255, 107, 0, 0.1); padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(255, 107, 0, 0.3); margin-top: 5px; display: inline-block;">Ver. 1.8.23</div>
+          <div id="app-version-label" style="font-size: 0.75rem; color: var(--neon-orange); font-weight: bold; background: rgba(255, 107, 0, 0.1); padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(255, 107, 0, 0.3); margin-top: 5px; display: inline-block;">Ver. 1.8.25</div>
     </div>
   </div>
 
@@ -167,7 +188,7 @@
     </div>
   </div>
 
-  <script type="module" src="login.js?v=1.8.23"></script>
-  <script type="module" src="messaging_service.js"></script>
+  <script type="module" src="login.js?v=1.8.25"></script>
+  <script type="module" src="messaging_service.js?v=1.8.25"></script>
 </body>
 </html>

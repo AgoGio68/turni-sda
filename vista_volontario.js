@@ -908,9 +908,38 @@ document.addEventListener('DOMContentLoaded', () => {
         if (snap.exists()) {
           currentUser = snap.data();
           let adminBtnHTML = currentUser.is_admin ? `<button id="btn-goto-admin" class="btn" style="margin-left:1rem; padding:0.3rem 0.6rem; font-size:0.8rem; border-color:var(--neon-green); color:var(--neon-green); background:rgba(57,255,20,0.1);">Accedi a Programmazione</button>` : "";
+          let notifyBtnHTML = "";
+          if (window.Notification && Notification.permission !== "granted") {
+              notifyBtnHTML = `<button id="btn-enable-notifications" class="btn" style="margin-left:1rem; padding:0.3rem 0.6rem; font-size:0.8rem; border-color:var(--neon-orange); color:var(--neon-orange); background:rgba(255,153,0,0.1); border-style:dashed;">🔔 Attiva Notifiche</button>`;
+          }
 
-          userInfoDiv.innerHTML = `Profilo: ${formattaNominativoUtente(currentUser)} ${adminBtnHTML} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
+          userInfoDiv.innerHTML = `Profilo: ${formattaNominativoUtente(currentUser)} ${adminBtnHTML} ${notifyBtnHTML} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
           document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+
+          if (document.getElementById('btn-enable-notifications')) {
+              document.getElementById('btn-enable-notifications').addEventListener('click', async () => {
+                  const btn = document.getElementById('btn-enable-notifications');
+                  btn.disabled = true;
+                  btn.textContent = "Attivazione...";
+                  try {
+                      await window.AppMessaging.requestNotificationPermissions(currentUser.matricola);
+                      await new Promise(resolve => setTimeout(resolve, 1500));
+                      if (Notification.permission === "granted") {
+                          btn.style.display = "none";
+                          alert("Notifiche attivate con successo per questo dispositivo!");
+                      } else {
+                          btn.disabled = false;
+                          btn.textContent = "🔔 Attiva Notifiche";
+                          alert("Permesso notifiche non concesso. Se hai già bloccato le notifiche, abilitale manualmente nelle impostazioni del tuo iPhone per questa app.");
+                      }
+                  } catch (err) {
+                      console.error(err);
+                      btn.disabled = false;
+                      btn.textContent = "🔔 Attiva Notifiche";
+                      alert("Errore durante l'attivazione: " + err.message);
+                  }
+              });
+          }
           if (currentUser.is_admin) {
               document.getElementById('btn-goto-admin').addEventListener('click', () => { window.location.href = "vista_responsabile.html"; });
           }

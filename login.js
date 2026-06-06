@@ -33,7 +33,18 @@ try {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Rilevamento iOS e PWA Standalone per visualizzazione Banner di installazione
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.platform) || 
+                (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+  const isStandalone = window.navigator.standalone === true || 
+                       window.matchMedia('(display-mode: standalone)').matches;
 
+  if (isIOS && !isStandalone) {
+    const pwaBanner = document.getElementById('ios-pwa-banner');
+    if (pwaBanner) {
+      pwaBanner.style.display = 'block';
+    }
+  }
 
   const btnLogin = document.getElementById('btn-login');
   const errorMsg = document.getElementById('login-error');
