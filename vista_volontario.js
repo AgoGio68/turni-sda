@@ -915,6 +915,9 @@ document.addEventListener('DOMContentLoaded', () => {
               document.getElementById('btn-goto-admin').addEventListener('click', () => { window.location.href = "vista_responsabile.html"; });
           }
           startTurniSnapshot();
+          if (typeof startVolunteerMessagingListener === 'function') {
+              startVolunteerMessagingListener(currentUser.matricola);
+          }
         } else {
           alert("Profilo volontario non trovato nel database.");
           signOut(auth);
@@ -940,6 +943,74 @@ document.addEventListener('DOMContentLoaded', () => {
           renderMicroDay(currentSelectedDate);
         }
       });
+  }
+
+  window.startVolunteerMessagingListener = function(volunteerMatricola) {
+      const unreadCountSpan = document.getElementById("vol-msg-unread-count");
+      const listContainer = document.getElementById("vol-messaging-list-container");
+
+      if (!volunteerMatricola) {
+          console.warn("[MESSAGING_UI] Impossibile avviare il listener: matricola utente non trovata.");
+          return;
+      }
+
+      if (window.AppMessaging && window.AppMessaging.listenForMessages) {
+          window.AppMessaging.listenForMessages(String(volunteerMatricola).trim(), (messaggi) => {
+              const unreadCount = messaggi.filter(m => !m.letto).length;
+              
+              if (unreadCount > 0) {
+                  unreadCountSpan.textContent = unreadCount;
+                  unreadCountSpan.style.display = "block";
+              } else {
+                  unreadCountSpan.style.display = "none";
+              }
+
+              if (messaggi.length === 0) {
+                  listContainer.innerHTML = `<p style="color: #888; text-align: center; margin-top: 50px;">Nessun messaggio per te.</p>`;
+                  return;
+              }
+
+              listContainer.innerHTML = messaggi.map(msg => {
+                  const borderNeon = msg.letto ? 'rgba(255,255,255,0.05)' : '1px solid #ff0055';
+                  const bgState = msg.letto ? 'rgba(255,255,255,0.02)' : 'rgba(255, 0, 85, 0.05)';
+                  
+                  return `
+                      <div class="msg-card" style="background: ${bgState}; border: 1px solid ${borderNeon}; border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+                          <div style="font-size: 11px; color: #888; margin-bottom: 5px; display: flex; justify-content: space-between;">
+                              <span>Da: Direzione (Matr. ${msg.mittente_matricola})</span>
+                              <span>${new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                          </div>
+                          <div style="font-size: 13px; color: #e0e0e0; line-height: 1.4; word-break: break-word;">${msg.testo}</div>
+                          ${!msg.letto ? `<button class="vol-mark-read-btn" data-id="${msg.id}" style="margin-top: 8px; background: transparent; border: 1px solid #00ffcc; color: #00ffcc; border-radius: 4px; font-size: 10px; padding: 2px 6px; cursor: pointer;">Segna come letto</button>` : ''}
+                      </div>
+                  `;
+              }).join('');
+
+              // Bind Mark As Read for volunteer layout
+              listContainer.querySelectorAll(".vol-mark-read-btn").forEach(btn => {
+                  btn.addEventListener("click", async (e) => {
+                      e.stopPropagation();
+                      const msgId = btn.getAttribute("data-id");
+                      if (window.AppMessaging.markAsRead) {
+                          await window.AppMessaging.markAsRead(msgId);
+                      }
+                  });
+              });
+          });
+      }
+  };
+
+  const badgeContainer = document.getElementById("volunteer-messaging-badge-container");
+  const msgPanel = document.getElementById("volunteer-messaging-panel");
+  const closePanelBtn = document.getElementById("close-vol-messaging-panel");
+
+  if (badgeContainer && msgPanel) {
+      badgeContainer.addEventListener("click", () => {
+          msgPanel.style.display = msgPanel.style.display === "none" ? "block" : "none";
+      });
+  }
+  if (closePanelBtn && msgPanel) {
+      closePanelBtn.addEventListener("click", () => { msgPanel.style.display = "none"; });
   }
 
 });
