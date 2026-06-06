@@ -1349,4 +1349,62 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
     }
+    // Function to populate targets dynamically
+    const populateVolunteerTargets = () => {
+        const targetSelect = document.getElementById("msg-target-select");
+        if (!targetSelect) return;
+
+        targetSelect.innerHTML = '<option value="ALL">Tutti i Volontari (ALL)</option>';
+
+        const activeVolunteers = Object.values(window.globalUsersMap || {});
+
+        if (activeVolunteers.length > 0) {
+            const sortedVolunteers = [...activeVolunteers].sort((a, b) => 
+                String(a.cognome || '').localeCompare(String(b.cognome || ''))
+            );
+
+            sortedVolunteers.forEach(v => {
+                if (v.matricola && (v.cognome || v.nome)) {
+                    const option = document.createElement("option");
+                    option.value = String(v.matricola).trim();
+                    option.textContent = `${v.cognome || ''} ${v.nome || ''}`.trim();
+                    targetSelect.appendChild(option);
+                }
+            });
+        } else {
+            console.warn("[UI_MESSAGING] Array dei volontari non trovato o vuoto. Riproviamo più tardi.");
+            setTimeout(populateVolunteerTargets, 2000); // Retry fallback
+        }
+    };
+
+    if (badgeContainer) {
+        setTimeout(populateVolunteerTargets, 1500); 
+    }
+
+    const btnSendMsg = document.getElementById("btn-send-msg");
+    const msgTextInput = document.getElementById("msg-text-input");
+    const msgTargetSelect = document.getElementById("msg-target-select");
+
+    if (btnSendMsg && msgTextInput && msgTargetSelect) {
+        btnSendMsg.addEventListener("click", async () => {
+            const testo = msgTextInput.value;
+            const destinatario = msgTargetSelect.value;
+            if (!testo.trim()) {
+                alert("Inserisci un testo per il messaggio.");
+                return;
+            }
+            if (window.AppMessaging && window.AppMessaging.sendMessage) {
+                btnSendMsg.disabled = true;
+                btnSendMsg.textContent = "Invio...";
+                const res = await window.AppMessaging.sendMessage(currentMatricola, destinatario, testo, "comunicazione_generica");
+                if (res && res.success) {
+                    msgTextInput.value = "";
+                } else {
+                    alert("Errore invio messaggio: " + (res.error || "Sconosciuto"));
+                }
+                btnSendMsg.disabled = false;
+                btnSendMsg.textContent = "Invia Messaggio";
+            }
+        });
+    }
 });
