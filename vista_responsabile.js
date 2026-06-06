@@ -1349,61 +1349,66 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
     }
-    // Function to populate targets dynamically
-    const populateVolunteerTargets = () => {
-        const targetSelect = document.getElementById("msg-target-select");
-        if (!targetSelect) return;
+    const typeSelect = document.getElementById("msg-type-select");
+    const searchInput = document.getElementById("msg-search-input");
+    const sendBtn = document.getElementById("send-msg-btn");
+    const textInput = document.getElementById("msg-text-input");
 
-        targetSelect.innerHTML = '<option value="ALL">Tutti i Volontari (ALL)</option>';
-
-        const activeVolunteers = Object.values(window.globalUsersMap || {});
-
-        if (activeVolunteers.length > 0) {
-            const sortedVolunteers = [...activeVolunteers].sort((a, b) => 
-                String(a.cognome || '').localeCompare(String(b.cognome || ''))
-            );
-
-            sortedVolunteers.forEach(v => {
-                if (v.matricola && (v.cognome || v.nome)) {
-                    const option = document.createElement("option");
-                    option.value = String(v.matricola).trim();
-                    option.textContent = `${v.cognome || ''} ${v.nome || ''}`.trim();
-                    targetSelect.appendChild(option);
-                }
-            });
-        } else {
-            console.warn("[UI_MESSAGING] Array dei volontari non trovato o vuoto. Riproviamo più tardi.");
-            setTimeout(populateVolunteerTargets, 2000); // Retry fallback
-        }
-    };
-
-    if (badgeContainer) {
-        setTimeout(populateVolunteerTargets, 1500); 
+    if (typeSelect && searchInput) {
+        typeSelect.addEventListener("change", () => {
+            searchInput.style.display = typeSelect.value === "SINGLE" ? "block" : "none";
+        });
     }
 
-    const btnSendMsg = document.getElementById("btn-send-msg");
-    const msgTextInput = document.getElementById("msg-text-input");
-    const msgTargetSelect = document.getElementById("msg-target-select");
+    if (sendBtn) {
+        sendBtn.addEventListener("click", async () => {
+            const testo = textInput.value.trim();
+            if (!testo) { alert("Il testo del messaggio è vuoto."); return; }
 
-    if (btnSendMsg && msgTextInput && msgTargetSelect) {
-        btnSendMsg.addEventListener("click", async () => {
-            const testo = msgTextInput.value;
-            const destinatario = msgTargetSelect.value;
-            if (!testo.trim()) {
-                alert("Inserisci un testo per il messaggio.");
-                return;
-            }
-            if (window.AppMessaging && window.AppMessaging.sendMessage) {
-                btnSendMsg.disabled = true;
-                btnSendMsg.textContent = "Invio...";
-                const res = await window.AppMessaging.sendMessage(currentMatricola, destinatario, testo, "comunicazione_generica");
-                if (res && res.success) {
-                    msgTextInput.value = "";
-                } else {
-                    alert("Errore invio messaggio: " + (res.error || "Sconosciuto"));
+            let destinatario = "ALL";
+            
+            if (typeSelect.value === "SINGLE") {
+                const ricerca = searchInput.value.trim().toLowerCase();
+                if (!ricerca) { alert("Inserisci il nome o cognome del volontario."); return; }
+
+                // Dynamic scan of any existing data array in memory
+                const arrayVolontari = window.listaUtenti || window.volontari || window.globalVolontari || Object.values(window.globalUsersMap || {});
+                const trovato = arrayVolontari.find(v => 
+                    String(v.cognome || '').toLowerCase().includes(ricerca) || 
+                    String(v.nome || '').toLowerCase().includes(ricerca)
+                );
+
+                if (!trovato || !trovato.matricola) {
+                    alert(`Nessun volontario trovato corrispondente a: "${ricerca}". Riprova.`);
+                    return;
                 }
-                btnSendMsg.disabled = false;
-                btnSendMsg.textContent = "Invia Messaggio";
+                
+                destinatario = String(trovato.matricola).trim();
+                console.log(`[MESSAGING] Match trovato: ${trovato.cognome} ${trovato.nome} -> Matr. ${destinatario}`);
+            }
+
+            const mittente = window.currentLoggedUserMatricola || "34";
+
+            sendBtn.disabled = true;
+            sendBtn.textContent = "Invio in corso...";
+
+            if (window.AppMessaging && window.AppMessaging.sendMessage) {
+                const response = await window.AppMessaging.sendMessage(mittente, destinatario, testo, "comunicazione_generica");
+
+                sendBtn.disabled = false;
+                sendBtn.textContent = "Invia Messaggio";
+
+                if (response.success) {
+                    textInput.value = "";
+                    searchInput.value = "";
+                    alert("Messaggio inviato con successo!");
+                } else {
+                    alert("Errore nell'invio: " + (response.error || "Sconosciuto"));
+                }
+            } else {
+                sendBtn.disabled = false;
+                sendBtn.textContent = "Invia Messaggio";
+                alert("Errore critico: Servizio di messaggistica non trovato.");
             }
         });
     }

@@ -40,12 +40,20 @@
     </div>
 
     <!-- Compose Form -->
-    <div style="margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px;">
-        <select id="msg-target-select" style="width: 100%; padding: 8px; margin-bottom: 10px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px;">
-            <option value="ALL">Tutti i Volontari (ALL)</option>
-        </select>
-        <textarea id="msg-text-input" rows="2" placeholder="Scrivi messaggio..." style="width: 100%; padding: 8px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; box-sizing: border-box;"></textarea>
-        <button id="btn-send-msg" style="width: 100%; padding: 8px; margin-top: 10px; background: #00ffcc; color: #000; font-weight: bold; border: none; border-radius: 4px; cursor: pointer;">Invia Messaggio</button>
+    <div id="messaging-composer" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 12px; margin-bottom: 20px;">
+        <div style="margin-bottom: 8px;">
+            <label style="font-size: 11px; color: #00ffcc; display: block; margin-bottom: 4px;">Invia a:</label>
+            <select id="msg-type-select" style="width: 100%; background: #1a1a24; color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 4px; font-size: 12px; outline: none; margin-bottom: 8px;">
+                <option value="ALL">Tutti i Volontari (ALL)</option>
+                <option value="SINGLE">Singolo Volontario (scrivi sotto)</option>
+            </select>
+            <input id="msg-search-input" type="text" placeholder="Scrivi Cognome o Nome..." style="display: none; width: 100%; background: #1a1a24; color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 6px; font-size: 12px; outline: none; box-sizing: border-box;">
+        </div>
+        <div style="margin-bottom: 8px;">
+            <label style="font-size: 11px; color: #00ffcc; display: block; margin-bottom: 4px;">Testo Messaggio:</label>
+            <textarea id="msg-text-input" rows="2" placeholder="Scrivi una comunicazione..." style="width: 100%; background: #1a1a24; color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 6px; font-size: 12px; resize: none; outline: none; box-sizing: border-box;"></textarea>
+        </div>
+        <button id="send-msg-btn" style="width: 100%; background: #00ffcc; color: #141419; border: none; border-radius: 4px; font-size: 12px; font-weight: bold; padding: 6px; cursor: pointer; box-shadow: 0 0 8px rgba(0,255,204,0.3); transition: all 0.2s;">Invia Messaggio</button>
     </div>
 
     <div id="messaging-list-container" style="height: calc(100vh - 220px); overflow-y: auto; padding-right: 5px;">
