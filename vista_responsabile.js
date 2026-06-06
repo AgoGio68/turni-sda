@@ -12,7 +12,7 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 */
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, getDocs, updateDoc, doc, onSnapshot, query, writeBatch, getDoc, runTransaction, setDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, collection, getDocs, updateDoc, doc, onSnapshot, query, writeBatch, getDoc, runTransaction, setDoc, deleteDoc, arrayUnion } from "firebase/firestore";
 import { formattaNominativoUtente, ordinaUtentiAlfabetico, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo, calcolaBuchiRuolo } from './utils.js';
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -353,11 +353,15 @@ document.addEventListener('DOMContentLoaded', () => {
                       toggleRegoleAdmin.checked = !!data.applicaRegoleAdmin;
                   } else {
                       // Document doesn't exist yet — initialize with safe defaults
-                      await setDoc(doc(db, "impostazioni", "regole_riposo"), {
-                          controllaRiposoVolontari: true,
-                          controllaRiposoDipendenti: false,
-                          applicaRegoleAdmin: false
-                      });
+                      try {
+                          await setDoc(doc(db, "impostazioni", "regole_riposo"), {
+                              controllaRiposoVolontari: true,
+                              controllaRiposoDipendenti: false,
+                              applicaRegoleAdmin: false
+                          });
+                      } catch (initErr) {
+                          console.error("Errore inizializzazione impostazioni:", initErr);
+                      }
                   }
               });
 
@@ -626,36 +630,69 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       const modificaOrarioAdmin = async (idTurno, ruolo, inizioSelezionato, fineAttuale) => {
-        const nuovaFine = prompt(`Modifica orario FINE per questo slot (Inizio: ${inizioSelezionato}):`, fineAttuale);
-        if (!nuovaFine) return;
-        if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(nuovaFine.trim())) {
-            alert("Formato non valido! Usa HH:MM (es. 19:00)");
-            return;
-        }
-        try {
-            const docRef = doc(db, "turni", idTurno);
-            await runTransaction(db, async (transaction) => {
-                const snap = await transaction.get(docRef);
-                if (!snap.exists()) throw "Turno non trovato";
-                let equipaggio = snap.data().equipaggio_attuale || {};
-                if (equipaggio[ruolo] && !Array.isArray(equipaggio[ruolo])) {
-                    equipaggio[ruolo] = Object.values(equipaggio[ruolo]).filter(v => v && typeof v === 'object' && v.matricola);
-                }
-                if (equipaggio[ruolo]) {
-                    equipaggio[ruolo] = equipaggio[ruolo].map(m => {
-                        if (m.inizio === inizioSelezionato) {
-                            return { ...m, fine: nuovaFine.trim() };
-                        }
-                        return m;
-                    });
-                }
-                transaction.update(docRef, { equipaggio_attuale: equipaggio });
-            });
-            console.log(`[ADMIN] Orario fine aggiornato a ${nuovaFine} per slot ${ruolo} inizio ${inizioSelezionato}`);
-        } catch (err) {
-            console.error("Errore modifica orario admin:", err);
-            alert("Errore nell'aggiornamento: " + err);
-        }
+          const nuovaFine = prompt(`Modifica orario FINE per questo slot (Inizio: ${inizioSelezionato}):`, fineAttuale);
+          if (!nuovaFine) return;
+          
+          const nuovaFineClean = String(nuovaFine).trim();
+          if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(nuovaFineClean)) {
+              alert("Formato non valido! Usa HH:MM (es. 19:00)");
+              return;
+          }
+
+          if (nuovaFineClean === String(fineAttuale).trim()) {
+              console.log("[IDEMPOTENCY] Nessuna modifica rilevata. Scrittura annullata.");
+              return;
+          }
+
+          try {
+              const docRef = doc(db, "turni", String(idTurno).trim());
+              await runTransaction(db, async (transaction) => {
+                  const snap = await transaction.get(docRef);
+                  if (!snap.exists()) throw "Turno non trovato";
+                  let equipaggio = snap.data().equipaggio_attuale || {};
+                  
+                  if (equipaggio[ruolo] && !Array.isArray(equipaggio[ruolo])) {
+                      equipaggio[ruolo] = Object.values(equipaggio[ruolo]).filter(v => v && typeof v === 'object' && v.matricola);
+                  }
+                  
+                  let changed = false;
+                  if (equipaggio[ruolo]) {
+                      equipaggio[ruolo] = equipaggio[ruolo].map(m => {
+                          if (String(m.inizio).trim() === String(inizioSelezionato).trim()) {
+                              if (String(m.fine).trim() !== nuovaFineClean) changed = true;
+                              return { 
+                                  matricola: String(m.matricola).trim(),
+                                  nominativo: String(m.nominativo).trim(),
+                                  inizio: String(m.inizio).trim(),
+                                  fine: nuovaFineClean,
+                                  convalidato_da_admin: !!m.convalidato_da_admin
+                              };
+                          }
+                          return {
+                              matricola: String(m.matricola).trim(),
+                              nominativo: String(m.nominativo).trim(),
+                              inizio: String(m.inizio).trim(),
+                              fine: String(m.fine).trim(),
+                              convalidato_da_admin: !!m.convalidato_da_admin
+                          };
+                      });
+                  }
+                  
+                  if (changed) {
+                      transaction.update(docRef, { equipaggio_attuale: equipaggio });
+                  } else {
+                      throw "NESSUNA_MODIFICA";
+                  }
+              });
+              console.log(`[ADMIN] Orario fine aggiornato a ${nuovaFineClean} per slot ${ruolo}`);
+          } catch (err) {
+              if (err === "NESSUNA_MODIFICA") {
+                  console.log("[IDEMPOTENCY] Transazione abortita: valori identici.");
+              } else {
+                  console.error("Errore modifica orario admin:", err);
+                  alert("Errore nell'aggiornamento: " + err);
+              }
+          }
       };
 
       const rimuoviVolontarioImprevisto = async (idTurno, ruolo, matricola) => {
@@ -664,7 +701,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Rimozione imprevista da ${idTurno} ruolo ${ruolo}`);
 
         try {
-            const docRef = doc(db, "turni", idTurno);
+            const docRef = doc(db, "turni", String(idTurno).trim());
             
             await runTransaction(db, async (transaction) => {
                 const turnoSnap = await transaction.get(docRef);
@@ -675,22 +712,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const eq = { ...turnoData.equipaggio_attuale };
                 
                 if (eq[ruolo]) {
-                    eq[ruolo] = eq[ruolo].filter(a => a.matricola !== matricola);
+                    eq[ruolo] = eq[ruolo].filter(a => String(a.matricola) !== String(matricola));
                 }
 
-                const logs = turnoData.log_modifiche || [];
-                logs.push({
+                const logEntry = {
                     timestamp: new Date().toISOString(),
-                    autore: currentAdminUser.matricola,
-                    azione: `Rimozione imprevista admin per slot ${ruolo.replace(/_/g, ' ')}`,
+                    autore: String(currentAdminUser.matricola).trim(),
+                    azione: String(`Rimozione imprevista admin per slot ${ruolo.replace(/_/g, ' ')}`).trim(),
                     notifica_inviata: false
-                });
+                };
 
                 console.log(`[DEBUG_DB] DATA_INVIO: Dati transazione calcolati per rimozione imprevista`);
 
                 transaction.update(docRef, {
                     equipaggio_attuale: eq,
-                    log_modifiche: logs
+                    log_modifiche: arrayUnion(logEntry)
                 });
             });
             
@@ -793,18 +829,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const turnoRef = doc(db, "turni", mod.idTurno);
                 
                 const logEntry = {
-                    timestamp: mod.timestamp,
-                    autore: currentAdminUser.matricola, // Usa vero utente admin
-                    azione: mod.azione,
+                    timestamp: String(mod.timestamp).trim(),
+                    autore: String(currentAdminUser.matricola).trim(), // Usa vero utente admin
+                    azione: String(mod.azione).trim(),
                     notifica_inviata: true
                 };
-
-                const logsAttuali = mod.turnoVecchio.log_modifiche || [];
                 
                 batch.update(turnoRef, {
                     equipaggio_attuale: mod.payloadModifica.nuovoEquipaggio,
                     stato_turno: mod.payloadModifica.nuovoStato,
-                    log_modifiche: [...logsAttuali, logEntry]
+                    log_modifiche: arrayUnion(logEntry)
                 });
 
                 logNotifiche.push({
@@ -840,16 +874,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const gestisciClickSpostamento = async (idTurno, ruolo, matricola) => {
           const turnoObj = turniOriginali.get(idTurno);
           if (!turnoObj) return;
-          const vol = turnoObj.equipaggio_attuale?.[ruolo]?.find(a => a.matricola === matricola);
+          const vol = turnoObj.equipaggio_attuale?.[ruolo]?.find(a => String(a.matricola) === String(matricola));
           if (!vol) return;
 
           try {
-              const docRef = doc(db, "spostamenti_attivi", currentAdminUser.matricola);
+              const docRef = doc(db, "spostamenti_attivi", String(currentAdminUser.matricola).trim());
               await setDoc(docRef, {
-                  sourceTurnoId: idTurno,
-                  sourceTurnoDataStr: turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')',
-                  sourceRoleKey: ruolo,
-                  volunteer: vol,
+                  sourceTurnoId: String(idTurno).trim(),
+                  sourceTurnoDataStr: String(turnoObj.data + ' (' + (turnoObj.orario?.inizio || '') + ')').trim(),
+                  sourceRoleKey: String(ruolo).trim(),
+                  volunteer: {
+                      matricola: String(vol.matricola).trim(),
+                      nominativo: String(vol.nominativo).trim(),
+                      inizio: String(vol.inizio).trim(),
+                      fine: String(vol.fine).trim()
+                  },
                   timestamp: new Date().toISOString()
               });
           } catch(err) {
@@ -905,29 +944,28 @@ document.addEventListener('DOMContentLoaded', () => {
                       convalidato_da_admin: true
                   }];
                   
-                  const sourceLogs = sourceData.log_modifiche || [];
-                  sourceLogs.push({
+                  const sourceLogEntry = {
                       timestamp: new Date().toISOString(),
-                      autore: currentAdminUser.matricola,
-                      azione: `Spostamento in uscita verso turno ${destData.data} (${destData.orario?.inizio || ''}) - slot ${ruoloDest}`,
+                      autore: String(currentAdminUser.matricola).trim(),
+                      azione: String(`Spostamento in uscita verso turno ${destData.data} (${destData.orario?.inizio || ''}) - slot ${ruoloDest}`).trim(),
                       notifica_inviata: false
-                  });
+                  };
                   
-                  const destLogs = destData.log_modifiche || [];
+                  let destLogEntry = null;
                   if (spostamentoAttivoGlobale.sourceTurnoId !== idTurnoDest) {
-                      destLogs.push({
+                      destLogEntry = {
                           timestamp: new Date().toISOString(),
-                          autore: currentAdminUser.matricola,
-                          azione: `Spostamento in ingresso dal turno ${sourceData.data} (${sourceData.orario?.inizio || ''}) - slot ${spostamentoAttivoGlobale.sourceRoleKey}`,
+                          autore: String(currentAdminUser.matricola).trim(),
+                          azione: String(`Spostamento in ingresso dal turno ${sourceData.data} (${sourceData.orario?.inizio || ''}) - slot ${spostamentoAttivoGlobale.sourceRoleKey}`).trim(),
                           notifica_inviata: false
-                      });
+                      };
                   }
 
                   if (spostamentoAttivoGlobale.sourceTurnoId === idTurnoDest) {
-                      transaction.update(sourceRef, { equipaggio_attuale: newDestEq, log_modifiche: sourceLogs });
+                      transaction.update(sourceRef, { equipaggio_attuale: newDestEq, log_modifiche: arrayUnion(sourceLogEntry) });
                   } else {
-                      transaction.update(sourceRef, { equipaggio_attuale: newSourceEq, log_modifiche: sourceLogs });
-                      transaction.update(destRef, { equipaggio_attuale: newDestEq, log_modifiche: destLogs });
+                      transaction.update(sourceRef, { equipaggio_attuale: newSourceEq, log_modifiche: arrayUnion(sourceLogEntry) });
+                      transaction.update(destRef, { equipaggio_attuale: newDestEq, log_modifiche: arrayUnion(destLogEntry) });
                   }
                   // Elimina stato
                   transaction.delete(docRefState);
@@ -978,8 +1016,11 @@ document.addEventListener('DOMContentLoaded', () => {
           document.body.appendChild(banner);
           document.getElementById('dynamic-btn-cancel-move').addEventListener('click', async () => {
               try {
-                  await deleteDoc(doc(db, "spostamenti_attivi", currentAdminUser.matricola));
-              } catch(e) {}
+                  await deleteDoc(doc(db, "spostamenti_attivi", String(currentAdminUser.matricola).trim()));
+              } catch(e) {
+                  console.error("Errore durante l'eliminazione dello spostamento:", e);
+                  alert("Errore di rete: impossibile annullare lo spostamento. Riprova.");
+              }
           });
       };
 
@@ -1213,10 +1254,10 @@ document.addEventListener('DOMContentLoaded', () => {
           newEq[field] = [
               ...fieldArray,
               {
-                  matricola: user.matricola,
-                  nominativo: user.nominativo || formattaNominativoUtente(user),
-                  inizio: startGap,
-                  fine: endGap,
+                  matricola: String(user.matricola).trim(),
+                  nominativo: String(user.nominativo || formattaNominativoUtente(user)).trim(),
+                  inizio: String(startGap).trim(),
+                  fine: String(endGap).trim(),
                   convalidato_da_admin: true
               }
           ];

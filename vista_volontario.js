@@ -744,10 +744,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     : [];
             }
             equipaggio[ruolo].push({
-                matricola,
-                nominativo,
-                inizio: bucoInizio,
-                fine: bucoFine,
+                matricola: String(matricola).trim(),
+                nominativo: String(nominativo).trim(),
+                inizio: String(bucoInizio).trim(),
+                fine: String(bucoFine).trim(),
                 convalidato_da_admin: false
             });
             transaction.update(docRef, { equipaggio_attuale: equipaggio });
@@ -788,10 +788,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const oraFine   = bucoFine   || turnoData.orario?.fine   || "14:00";
 
             const nuovoMembro = {
-                matricola: currentUser.matricola,
-                nominativo: `${currentUser.cognome} ${currentUser.nome}`,
-                inizio: oraInizio,
-                fine:   oraFine,
+                matricola: String(currentUser.matricola).trim(),
+                nominativo: String(`${currentUser.cognome} ${currentUser.nome}`).trim(),
+                inizio: String(oraInizio).trim(),
+                fine:   String(oraFine).trim(),
                 convalidato_da_admin: false
             };
 
@@ -813,16 +813,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const nuovoOrarioFine = prompt(`Modifica l'orario di fine per questo blocco (Inizio: ${inizioSelezionato}):`, orarioFineAttuale);
     if (!nuovoOrarioFine) return;
 
-    if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(nuovoOrarioFine.trim())) {
+    const nuovaFineClean = String(nuovoOrarioFine).trim();
+    if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(nuovaFineClean)) {
         alert("Formato non valido! Usa il formato HH:MM (es. 19:00)");
         return;
     }
 
-    console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Modifica orario fine a ${idTurno} ruolo ${ruolo} per ${nuovoOrarioFine} (Inizio: ${inizioSelezionato})`);
+    if (nuovaFineClean === String(orarioFineAttuale).trim()) {
+        console.log("[IDEMPOTENCY] Nessuna modifica all'orario rilevata. Scrittura annullata.");
+        return;
+    }
+
+    console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Modifica orario fine a ${idTurno} ruolo ${ruolo} per ${nuovaFineClean} (Inizio: ${inizioSelezionato})`);
     isUpdating = true;
 
     try {
-        const docRef = doc(db, "turni", idTurno);
+        const docRef = doc(db, "turni", String(idTurno).trim());
         await runTransaction(db, async (transaction) => {
             const snap = await transaction.get(docRef);
             if (!snap.exists()) throw "Turno non trovato";
@@ -834,25 +840,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 const vals = Object.values(equipaggio[ruolo]).filter(v => v && typeof v === 'object' && v.matricola);
                 equipaggio[ruolo] = vals;
             }
+            let changed = false;
             if (equipaggio[ruolo]) {
                 const isAdmin = currentUser && (currentUser.ruolo === 'admin' || currentUser.ruolo === 'superadmin' || currentUser.is_admin === true);
                 equipaggio[ruolo] = equipaggio[ruolo].map(m => {
-                    // Admin: match by inizio only (editing any member's record)
-                    // Self: also match by matricola for extra safety
-                    const matchAdmin = isAdmin && m.inizio === inizioSelezionato;
-                    const matchSelf = !isAdmin && String(m.matricola) === String(currentUser.matricola) && m.inizio === inizioSelezionato;
+                    const matchAdmin = isAdmin && String(m.inizio).trim() === String(inizioSelezionato).trim();
+                    const matchSelf = !isAdmin && String(m.matricola) === String(currentUser.matricola) && String(m.inizio).trim() === String(inizioSelezionato).trim();
                     if (matchAdmin || matchSelf) {
-                        return { ...m, fine: nuovoOrarioFine.trim() };
+                        if (String(m.fine).trim() !== nuovaFineClean) changed = true;
+                        return { 
+                            matricola: String(m.matricola).trim(),
+                            nominativo: String(m.nominativo).trim(),
+                            inizio: String(m.inizio).trim(),
+                            fine: nuovaFineClean,
+                            convalidato_da_admin: !!m.convalidato_da_admin
+                        };
                     }
-                    return m;
+                    return {
+                        matricola: String(m.matricola).trim(),
+                        nominativo: String(m.nominativo).trim(),
+                        inizio: String(m.inizio).trim(),
+                        fine: String(m.fine).trim(),
+                        convalidato_da_admin: !!m.convalidato_da_admin
+                    };
                 });
             }
-            transaction.update(docRef, { equipaggio_attuale: equipaggio });
+            if (changed) {
+                transaction.update(docRef, { equipaggio_attuale: equipaggio });
+            } else {
+                throw "NESSUNA_MODIFICA";
+            }
         });
         console.log("[DEBUG_DB] CONFERMA_FIRESTORE: Modifica orario confermata da DB");
     } catch (e) {
-        console.error("Errore durante la modifica dell'orario:", e);
-        alert("Errore nell'aggiornamento: " + e);
+        if (e === "NESSUNA_MODIFICA") {
+            console.log("[IDEMPOTENCY] Transazione abortita: valori identici.");
+        } else {
+            console.error("Errore durante la modifica dell'orario:", e);
+            alert("Errore nell'aggiornamento: " + e);
+        }
     } finally {
         isUpdating = false;
         // Rendering delegato a onSnapshot per dati sempre freschi
