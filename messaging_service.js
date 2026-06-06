@@ -1,6 +1,6 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, addDoc, query, where, onSnapshot, orderBy, limit, updateDoc, doc, setDoc } from "firebase/firestore";
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getFirestore, collection, addDoc, query, where, onSnapshot, orderBy, limit, updateDoc, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -20,7 +20,7 @@ try {
   console.error("Firebase init error in messaging_service:", e);
 }
 
-// INSERISCI QUI LA TUA VAPID KEY DA CONSOLE FIREBASE SE DISPONIBILE
+// Inserisci qui la chiave VAPID estratta dalle impostazioni di Cloud Messaging se vuoi registrare i token
 const VAPID_KEY = "CHIAVE_VAPID_DEFAULTS_DA_CONSOLE_SE_GENERATA";
 
 window.AppMessaging = {
@@ -75,14 +75,17 @@ window.AppMessaging = {
         try {
             const permission = await Notification.requestPermission();
             if (permission === "granted") {
-                const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
+                const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY }).catch((e) => {
+                    console.warn("[FCM] Impossibile recuperare il token (manca VAPID key o configurazione HTTPS):", e);
+                    return null;
+                });
                 if (currentToken) {
                     await setDoc(doc(db, "dispositivi_notifiche", String(matricolaUtente).trim()), {
                         token_fcm: currentToken,
                         ultimo_aggiornamento: new Date().toISOString(),
                         piattaforma: "web_browser"
                     }, { merge: true });
-                    console.log("[FCM] Token registrato per la matricola:", matricolaUtente);
+                    console.log("[FCM] Token registrato correttamente per la matricola:", matricolaUtente);
                 }
             }
         } catch (err) { console.error("Errore permessi push:", err); }
@@ -92,8 +95,8 @@ window.AppMessaging = {
         if (!messaging) return;
         onMessage(messaging, (payload) => {
             const audio = new Audio("assets/audio/alarm.mp3");
-            audio.play().catch(() => console.log("Audio bloccato dalle policy del browser. Serve un click dell'utente."));
-            alert(`🚨 ${payload.notification.title || 'AVVISO URGENTE'}\n\n${payload.notification.body || ''}`);
+            audio.play().catch(() => console.log("Riproduzione audio bloccata dalle policy del browser. Serve un click."));
+            alert(`🚨 ${payload.notification?.title || 'AVVISO URGENTE'}\n\n${payload.notification?.body || payload.data?.body || ''}`);
         });
     }
 };
