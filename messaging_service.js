@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, addDoc, query, where, onSnapshot, orderBy, limit, updateDoc, doc } from "firebase/firestore";
+import { getFirestore, collection, addDoc, query, where, onSnapshot, orderBy, limit, updateDoc, doc, setDoc } from "firebase/firestore";
+import { getMessaging, getToken, onMessage } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -10,19 +11,21 @@ const firebaseConfig = {
   appId: "1:840030023706:web:1a6f738ed3051075c5a1a3"
 };
 
-let app, db;
+let app, db, messaging;
 try {
   app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   db = getFirestore(app);
+  messaging = getMessaging(app);
 } catch (e) {
   console.error("Firebase init error in messaging_service:", e);
 }
 
+// INSERISCI QUI LA TUA VAPID KEY DA CONSOLE FIREBASE SE DISPONIBILE
+const VAPID_KEY = "CHIAVE_VAPID_DEFAULTS_DA_CONSOLE_SE_GENERATA";
+
 window.AppMessaging = {
-    // A. Send a message using a standard root collection (gestione-corso120 style)
-    sendMessage: async (mittente, destinatario, testo, tipo = "comunicazione_generica", parametri_push = null) => {
+    sendMessage: async (mittente, destinatario, testo, tipo = "comunicazione_generica", opzioniPush = {}) => {
         if (!testo || !String(testo).trim()) return { success: false, error: "Testo vuoto" };
-        
         try {
             const payload = {
                 mittente_matricola: String(mittente).trim(),
@@ -30,56 +33,67 @@ window.AppMessaging = {
                 testo: String(testo).trim(),
                 tipo: String(tipo).trim(),
                 timestamp: new Date().toISOString(),
-                letto: false
+                letto: false,
+                notifica: {
+                    richiede_push: opzioniPush.richiede_notifica_push || false,
+                    urgente: opzioniPush.urgente || false,
+                    suono: opzioniPush.suono || "default",
+                    titolo: opzioniPush.titolo_notifica || "Nuovo Messaggio"
+                }
             };
-            
-            if (parametri_push) {
-                payload.parametri_push = parametri_push;
-            }
-            
             const docRef = await addDoc(collection(db, "comunicazioni_turni"), payload);
-            console.log(`[MESSAGING] Messaggio inviato con ID: ${docRef.id}`);
             return { success: true, id: docRef.id };
         } catch (err) {
-            console.error("[MESSAGING_ERROR] Fallimento invio messaggio:", err);
             return { success: false, error: err.message || err };
         }
     },
 
-    // B. Real-time listener using standard query
     listenForMessages: (matricolaUtente, callbackUI) => {
         if (!matricolaUtente) return null;
-
         const q = query(
             collection(db, "comunicazioni_turni"),
             where("destinatario_matricola", "in", [String(matricolaUtente).trim(), "ALL"]),
             orderBy("timestamp", "desc"),
             limit(50)
         );
-
         return onSnapshot(q, (snapshot) => {
             const messaggi = [];
-            snapshot.forEach((docSnap) => {
-                messaggi.push({ id: docSnap.id, ...docSnap.data() });
-            });
-            console.log(`[MESSAGING] Ricevuti ${messaggi.length} messaggi in tempo reale.`);
-            if (typeof callbackUI === "function") {
-                callbackUI(messaggi);
-            }
-        }, (err) => {
-            console.error("[MESSAGING_ERROR] Errore durante l'ascolto dei messaggi:", err);
-        });
+            snapshot.forEach((docSnap) => { messaggi.push({ id: docSnap.id, ...docSnap.data() }); });
+            if (typeof callbackUI === "function") callbackUI(messaggi);
+        }, (err) => { console.error("Errore ascolto:", err); });
     },
 
-    // C. Mark as read by document ID
     markAsRead: async (idMessaggio) => {
         if (!idMessaggio) return;
         try {
-            const docRef = doc(db, "comunicazioni_turni", String(idMessaggio).trim());
-            await updateDoc(docRef, { letto: true });
-            console.log(`[MESSAGING] Messaggio ${idMessaggio} segnato come letto.`);
-        } catch (err) {
-            console.error("[MESSAGING_ERROR] Impossibile aggiornare stato lettura:", err);
-        }
+            await updateDoc(doc(db, "comunicazioni_turni", String(idMessaggio).trim()), { letto: true });
+        } catch (err) { console.error("Errore markAsRead:", err); }
+    },
+
+    requestNotificationPermissions: async (matricolaUtente) => {
+        if (!matricolaUtente || !messaging) return;
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission === "granted") {
+                const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY }).catch(() => null);
+                if (currentToken) {
+                    await setDoc(doc(db, "dispositivi_notifiche", String(matricolaUtente).trim()), {
+                        token_fcm: currentToken,
+                        ultimo_aggiornamento: new Date().toISOString(),
+                        piattaforma: "web_browser"
+                    }, { merge: true });
+                    console.log("[FCM] Token registrato per la matricola:", matricolaUtente);
+                }
+            }
+        } catch (err) { console.error("Errore permessi push:", err); }
+    },
+
+    listenInForeground: () => {
+        if (!messaging) return;
+        onMessage(messaging, (payload) => {
+            const audio = new Audio("assets/audio/alarm.mp3");
+            audio.play().catch(() => console.log("Audio bloccato dalle policy del browser. Serve un click dell'utente."));
+            alert(`🚨 ${payload.notification.title || 'AVVISO URGENTE'}\n\n${payload.notification.body || ''}`);
+        });
     }
 };

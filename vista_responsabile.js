@@ -1488,3 +1488,12 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 });
+
+// Append strictly at the end of the script configuration initialization:
+document.addEventListener("DOMContentLoaded", () => {
+    if (window.AppMessaging && window.AppMessaging.requestNotificationPermissions) {
+        const userMatricola = window.currentLoggedUserMatricola || "34";
+        window.AppMessaging.requestNotificationPermissions(userMatricola);
+        window.AppMessaging.listenInForeground();
+    }
+});
