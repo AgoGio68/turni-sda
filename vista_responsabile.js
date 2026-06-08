@@ -860,6 +860,31 @@ document.addEventListener('DOMContentLoaded', () => {
             if (azione.includes('Convalida')) {
                 // Imposta convalidato_da_admin = true a tutti
                 const validatedEq = { ...currentEq };
+
+                // Validazione: Impedisci convalida se ci sono ruoli sovrapposti nello stesso turno
+                const seenMatricole = new Set();
+                let overlapFound = false;
+                let overlapName = "";
+                ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(r => {
+                    const slot = validatedEq[r];
+                    if (!slot) return;
+                    const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
+                    slotArr.forEach(m => {
+                        if (m && m.matricola) {
+                            const matr = String(m.matricola).trim();
+                            if (seenMatricole.has(matr)) {
+                                overlapFound = true;
+                                overlapName = m.nominativo || matr;
+                            }
+                            seenMatricole.add(matr);
+                        }
+                    });
+                });
+                if (overlapFound) {
+                    alert(`Impossibile convalidare: Il volontario (${overlapName}) è inserito in più ruoli in questo turno. Rimuovilo da uno dei ruoli prima di procedere.`);
+                    return;
+                }
+
                 ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(r => {
                     if (validatedEq[r]) {
                         validatedEq[r] = validatedEq[r].map(a => ({ ...a, convalidato_da_admin: true }));
@@ -927,6 +952,32 @@ document.addEventListener('DOMContentLoaded', () => {
             const logNotifiche = [];
 
             for (const mod of modificheSospese) {
+                const newEq = mod.payloadModifica.nuovoEquipaggio || {};
+
+                // Validazione preventiva per evitare il salvataggio di ruoli duplicati
+                const seenMatricole = new Set();
+                let overlapFound = false;
+                let overlapName = "";
+                ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(r => {
+                    const slot = newEq[r];
+                    if (!slot) return;
+                    const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
+                    slotArr.forEach(m => {
+                        if (m && m.matricola) {
+                            const matr = String(m.matricola).trim();
+                            if (seenMatricole.has(matr)) {
+                                overlapFound = true;
+                                overlapName = m.nominativo || matr;
+                            }
+                            seenMatricole.add(matr);
+                        }
+                    });
+                });
+                if (overlapFound) {
+                    alert(`Impossibile salvare: Il volontario (${overlapName}) risulta assegnato a più ruoli in uno dei turni modificati.`);
+                    return;
+                }
+
                 const turnoRef = doc(db, "turni", mod.idTurno);
                 
                 const logEntry = {
