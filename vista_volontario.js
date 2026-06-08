@@ -745,12 +745,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const snap = await transaction.get(docRef);
             if (!snap.exists()) throw "Turno non trovato";
             let equipaggio = snap.data().equipaggio_attuale || {};
-            // Sicurezza: converti formati legacy in array
             if (!equipaggio[ruolo] || !Array.isArray(equipaggio[ruolo])) {
                 const old = equipaggio[ruolo];
                 equipaggio[ruolo] = (old && typeof old === 'object') 
                     ? Object.values(old).filter(v => v && typeof v === 'object' && v.matricola) 
                     : [];
+            }
             // Validazione: controlla che il volontario non sia già assegnato a un altro ruolo nello stesso turno
             const matricolaStr = String(matricola).trim();
             const giaIscrittoInAltroRuolo = ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].some(r => {
