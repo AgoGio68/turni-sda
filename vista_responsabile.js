@@ -1039,6 +1039,16 @@ document.addEventListener('DOMContentLoaded', () => {
                   newSourceEq[spostamentoAttivoGlobale.sourceRoleKey] = newSourceEq[spostamentoAttivoGlobale.sourceRoleKey].filter(a => a.matricola !== spostamentoAttivoGlobale.volunteer.matricola);
                   
                   const newDestEq = (spostamentoAttivoGlobale.sourceTurnoId === idTurnoDest) ? newSourceEq : { ...destEq };
+                  const volMatricolaStr = String(spostamentoAttivoGlobale.volunteer.matricola).trim();
+                  const giaIscrittoInAltroRuolo = ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].some(r => {
+                      if (r === ruoloDest) return false;
+                      const slot = newDestEq[r];
+                      if (!slot) return false;
+                      const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
+                      return slotArr.some(m => String(m.matricola) === volMatricolaStr);
+                  });
+                  if (giaIscrittoInAltroRuolo) throw "SLOT_DOPPIO_RUOLO";
+
                   const destRuolo = newDestEq[ruoloDest] || [];
                   newDestEq[ruoloDest] = [...destRuolo, {
                       ...spostamentoAttivoGlobale.volunteer,
@@ -1079,6 +1089,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   alert("Errore: Il volontario che stavi cercando di spostare è stato rimosso o modificato da un altro admin nel frattempo.");
               } else if (e === "SLOT_OCCUPATO") {
                   alert("Errore: Lo slot di destinazione è stato appena occupato da un altro admin. Operazione annullata.");
+              } else if (e === "SLOT_DOPPIO_RUOLO") {
+                  alert("Errore: Il volontario è già assegnato a un altro ruolo in questo turno di destinazione.");
               } else {
                   console.error(e);
                   alert("Si è verificato un errore di rete durante la transazione.");
@@ -1292,6 +1304,19 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!(possiedeRuolo(v, 'allievo/a') || possiedeRuolo(v, 'allievo') || possiedeRuolo(v, 'allieva'))) return false;
       }
 
+      // 4. Escludi se già iscritto a un altro ruolo nello stesso turno
+      const turnoObj = turniOriginali.get(modalTurnoId);
+      if (turnoObj) {
+          const giaNelTurno = ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].some(r => {
+              if (r === targetField) return false;
+              const slot = turnoObj.equipaggio_attuale?.[r];
+              if (!slot) return false;
+              const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
+              return slotArr.some(a => String(a.matricola) === String(v.matricola));
+          });
+          if (giaNelTurno) return false;
+      }
+
       return true;
     });
 
@@ -1347,6 +1372,18 @@ document.addEventListener('DOMContentLoaded', () => {
           const turnoData = sanificaTurno({ ...turnoDataRaw, orario: turnoDataRaw.orario || { inizio: "00:00", fine: "00:00" } });
           const currentEq = turnoData.equipaggio_attuale || {};
           
+          const userMatricolaStr = String(user.matricola).trim();
+          const giaIscrittoInAltroRuolo = ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].some(r => {
+              if (r === field) return false;
+              const slot = currentEq[r];
+              if (!slot) return false;
+              const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
+              return slotArr.some(m => String(m.matricola) === userMatricolaStr);
+          });
+          if (giaIscrittoInAltroRuolo) {
+              throw "Il volontario è già assegnato a un altro ruolo in questo turno.";
+          }
+
           // Se stavamo inserendo in uno slot originariamente libero, ma ora è occupato, blocchiamo
           // Nota: potremmo usare calcolaCoperturaRuolo per essere più precisi, ma in caso di array accodiamo
           const fieldArray = Array.isArray(currentEq[field]) ? currentEq[field] : Object.values(currentEq[field] || {});
@@ -1376,7 +1413,7 @@ document.addEventListener('DOMContentLoaded', () => {
           alert("Slot appena occupato da un altro utente. L'operazione è stata annullata per evitare sovrascritture accidentali.");
       } else {
           console.error(e);
-          alert("Errore durante l'aggiornamento del turno.");
+          alert("Errore durante l'aggiornamento del turno: " + e);
       }
     }
   }

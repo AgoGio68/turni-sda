@@ -138,6 +138,15 @@ document.addEventListener('DOMContentLoaded', () => {
           const controlloMansione = verificaIscrizione(u, turno, keyRuolo);
           if (!controlloMansione.idoneo) return;
 
+          const giaNelTurno = ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].some(r => {
+              if (r === keyRuolo) return false;
+              const slot = turno.equipaggio_attuale?.[r];
+              if (!slot) return false;
+              const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
+              return slotArr.some(a => String(a.matricola) === String(u.id) || String(a.matricola) === String(u.matricola));
+          });
+          if (giaNelTurno) return;
+
           const turniVolontario = turniList.reduce((acc, t) => {
               if (t.id === turno.id) return acc;
               const e = t.equipaggio_attuale || {};
@@ -742,7 +751,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 equipaggio[ruolo] = (old && typeof old === 'object') 
                     ? Object.values(old).filter(v => v && typeof v === 'object' && v.matricola) 
                     : [];
-            }
+            // Validazione: controlla che il volontario non sia già assegnato a un altro ruolo nello stesso turno
+            const matricolaStr = String(matricola).trim();
+            const giaIscrittoInAltroRuolo = ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].some(r => {
+                if (r === ruolo) return false;
+                const slot = equipaggio[r];
+                if (!slot) return false;
+                const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
+                return slotArr.some(m => String(m.matricola) === matricolaStr);
+            });
+            if (giaIscrittoInAltroRuolo) throw "Il volontario è già assegnato a un altro ruolo in questo turno.";
+
             equipaggio[ruolo].push({
                 matricola: String(matricola).trim(),
                 nominativo: String(nominativo).trim(),
@@ -794,6 +813,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 fine:   String(oraFine).trim(),
                 convalidato_da_admin: false
             };
+
+            // Validazione: controlla che l'utente non sia già iscritto a un altro ruolo nello stesso turno
+            const matricolaStr = String(currentUser.matricola).trim();
+            const giaIscrittoInAltroRuolo = ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].some(r => {
+                if (r === ruolo) return false;
+                const slot = equipaggio[r];
+                if (!slot) return false;
+                const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
+                return slotArr.some(m => String(m.matricola) === matricolaStr);
+            });
+            if (giaIscrittoInAltroRuolo) throw "Sei già iscritto a questo turno con un altro ruolo.";
 
             console.log("[DEBUG_DB] DATA_INVIO:", nuovoMembro);
             equipaggio[ruolo].push(nuovoMembro);
