@@ -28,32 +28,104 @@
       justify-content: center;
       min-height: 100vh;
       margin: 0;
+      padding: 1rem;
+      box-sizing: border-box;
     }
     .login-container {
       width: 100%;
       max-width: 400px;
       text-align: center;
+      padding: 2.5rem 2rem !important;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
     }
     .login-form {
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
-      margin-top: 2rem;
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+    }
+    .input-group {
+      position: relative;
+      width: 100%;
     }
     .input-field {
       width: 100%;
-      padding: 1rem;
+      padding: 1rem 1rem 1rem 2.8rem;
       border-radius: var(--radius);
       border: 1px solid var(--border-glass);
-      background: rgba(255,255,255,0.05);
+      background: rgba(255, 255, 255, 0.04);
       color: var(--text-main);
       font-size: 1rem;
       outline: none;
       box-sizing: border-box;
+      transition: all 0.3s ease;
     }
     .input-field:focus {
       border-color: var(--primary-neon);
-      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+      background: rgba(59, 130, 246, 0.05);
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.25);
+    }
+    .input-icon {
+      position: absolute;
+      left: 1.1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.1rem;
+      opacity: 0.4;
+      pointer-events: none;
+      transition: all 0.3s ease;
+    }
+    .input-field:focus ~ .input-icon {
+      opacity: 1;
+      transform: translateY(-50%) scale(1.1);
+    }
+    .btn-submit {
+      width: 100%;
+      padding: 0.95rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+      border-radius: var(--radius);
+      border: 1px solid var(--primary-neon);
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.1) 100%);
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      text-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      margin-top: 0.5rem;
+    }
+    .btn-submit:hover:not(:disabled) {
+      background: var(--primary-neon);
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+      transform: translateY(-2px);
+    }
+    .btn-submit:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    .btn-submit:disabled {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      cursor: not-allowed;
+      box-shadow: none;
+      text-shadow: none;
+    }
+    .btn-secondary {
+      width: 100%;
+      padding: 0.75rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-glass);
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-main);
+      border-color: rgba(255, 255, 255, 0.2);
     }
     
     /* Modal Cambio Password */
@@ -92,21 +164,30 @@
   </div>
 
   <div class="login-container glass-panel">
-    <h1 style="color: var(--primary-neon); margin:0;">🚨 Turni SDA</h1>
-    <p style="color: var(--text-muted); margin-top: 0.5rem;">Accesso Volontari e Operatori</p>
+    <div style="font-size: 3rem; margin-bottom: 0.5rem;">🚨</div>
+    <h1 style="color: var(--primary-neon); margin:0; font-size: 1.8rem; letter-spacing: 0.5px;">Turni SDA</h1>
+    <p style="color: var(--text-muted); margin-top: 0.25rem; font-size: 0.95rem; margin-bottom: 2rem;">Accesso Volontari e Operatori</p>
     
     <div class="login-form">
-      <div>
-        <input type="text" id="matricola" class="input-field" placeholder="Matricola (es. 123)" required>
+      <div class="input-group">
+        <input type="text" id="matricola" class="input-field" placeholder="Matricola (es. 123)" required autocomplete="username">
+        <span class="input-icon">👤</span>
       </div>
-      <div>
-        <input type="password" id="password" class="input-field" placeholder="Password" required>
+      
+      <div class="input-group">
+        <input type="password" id="password" class="input-field" placeholder="Password" required autocomplete="current-password">
+        <span class="input-icon">🔒</span>
       </div>
-      <button class="btn" id="btn-login" style="width: 100%; padding: 1rem; font-size: 1.1rem;">Accedi al Sistema</button>
-      <button id="btn-open-guide" class="btn" type="button" style="width: 100%; padding: 0.8rem; font-size: 0.95rem; background: rgba(255,255,255,0.05); color: var(--text-main); border: 1px solid var(--border-glass); margin-top: -0.5rem;">📖 Guida Applicazione</button>
-      <p id="login-error" style="color: var(--neon-red); font-size: 0.85rem; height: 1rem;"></p>
-          <!-- NOTA PER LO SVILUPPO: AGGIORNARE LA VERSIONE SOLO ED ESCLUSIVAMENTE QUI. QUESTA E' L'UNICA FONTE DI VERITA' -->
-          <div id="app-version-label" style="font-size: 0.75rem; color: var(--neon-orange); font-weight: bold; background: rgba(255, 107, 0, 0.1); padding: 2px 8px; border-radius: 12px; border: 1px solid rgba(255, 107, 0, 0.3); margin-top: 5px; display: inline-block;">Ver. 1.8.27</div>
+      
+      <button class="btn-submit" id="btn-login">Accedi al Sistema</button>
+      <button id="btn-open-guide" class="btn-secondary" type="button">📖 Guida Applicazione</button>
+      
+      <p id="login-error" style="color: var(--neon-red); font-size: 0.85rem; height: 1.2rem; margin: 0.25rem 0; font-weight: 500;"></p>
+      
+      <!-- NOTA PER LO SVILUPPO: AGGIORNARE LA VERSIONE SOLO ED ESCLUSIVAMENTE QUI. QUESTA E' L'UNICA FONTE DI VERITA' -->
+      <div style="margin-top: 0.5rem;">
+        <div id="app-version-label" style="font-size: 0.75rem; color: var(--neon-orange); font-weight: bold; background: rgba(255, 107, 0, 0.1); padding: 4px 12px; border-radius: 12px; border: 1px solid rgba(255, 107, 0, 0.3); display: inline-block; letter-spacing: 0.5px;">Ver. 1.8.32</div>
+      </div>
     </div>
   </div>
 
@@ -125,61 +206,90 @@
   <div class="pw-modal-overlay" id="guide-modal">
     <div class="pw-modal-box" style="max-width: 800px; max-height: 90vh; overflow-y: auto; text-align: left; padding: 2.5rem;">
       <h2 style="color: var(--primary-neon); margin-top:0; text-align: center; font-size: 1.8rem; letter-spacing: 1px;">📖 Guida Operativa Definitiva</h2>
-      <p style="color: var(--text-muted); text-align: center; margin-bottom: 2rem;">Manuale d'uso del Sistema Informativo Turni SDA</p>
+      <p style="color: var(--text-muted); text-align: center; margin-bottom: 2rem;">Manuale d'uso e Novità del Sistema Informativo Turni SDA</p>
       
-      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem;">1. INTRODUZIONE</h3>
-      <p style="color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">Benvenuto nel sistema turni-sda. Gestione operativa diretta dal Superadmin: <strong>AgoGio</strong>.</p>
+      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem;">1. INTRODUZIONE E SUPPORTO PWA</h3>
+      <p style="color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
+        Benvenuto nel sistema turni-sda. Gestione operativa diretta dal Superadmin: <strong>AgoGio</strong>.<br>
+        Il sistema è ora una <strong>Progressive Web App (PWA)</strong>: può essere installato direttamente sulla schermata Home del tuo smartphone Android o iOS per un'avvio ultrarapido a schermo intero e prestazioni superiori.
+      </p>
       <div style="background: rgba(255,7,58,0.1); border-left: 3px solid var(--neon-red); padding: 0.8rem; margin: 1rem 0;">
         <strong style="color: var(--neon-red);">⚠️ OBBLIGO DI SICUREZZA:</strong> 
-        <span style="color: var(--text-main); font-size: 0.9rem;">Al primo accesso, è tassativamente richiesto all'utente di modificare la password di default nelle impostazioni profilo per garantire la sicurezza del sistema.</span>
+        <span style="color: var(--text-main); font-size: 0.9rem;">Al primo accesso, è tassativamente richiesto all'utente di modificare la password di default nelle impostazioni profilo per garantire la sicurezza del proprio account.</span>
       </div>
 
       <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">2. LEGENDA ICONE E STATI</h3>
       <ul style="list-style: none; padding: 0; color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
-        <li style="margin-bottom: 0.8rem;"><strong><span class="badge" style="background:rgba(255,7,58,0.1); border:1px solid var(--neon-red); color:var(--neon-red); font-size: 0.7rem; padding: 0.2rem 0.4rem; border-radius: 4px;">CRITICO</span> (Badge Rosso):</strong> Segnala una grave scopertura dell'equipaggio.</li>
-        <li style="margin-bottom: 0.8rem;"><strong><span style="color:var(--neon-red); font-weight:bold;">▲ DA COPRIRE</span>:</strong> Indica una posizione operativa vacante che necessita di copertura immediata.</li>
-        <li style="margin-bottom: 0.8rem;"><strong><span style="color:var(--neon-red); font-weight:bold;">Vuoto</span>:</strong> Slot di equipaggio non ancora assegnato.</li>
-        <li style="margin-bottom: 0.8rem;"><strong><span style="color:var(--text-muted); font-weight:bold;">N.D.</span>:</strong> Slot non disponibile o non applicabile per quella tipologia di servizio.</li>
+        <li style="margin-bottom: 0.8rem;"><strong><span class="badge" style="background:rgba(255,7,58,0.1); border:1px solid var(--neon-red); color:var(--neon-red); font-size: 0.7rem; padding: 0.2rem 0.4rem; border-radius: 4px;">CRITICO</span> (Badge Rosso):</strong> Segnala una grave scopertura dell'equipaggio in quel turno.</li>
+        <li style="margin-bottom: 0.8rem;"><strong><span style="color:var(--neon-red); font-weight:bold;">▲ DA COPRIRE</span>:</strong> Indica una posizione operativa vacante che necessita di copertura.</li>
+        <li style="margin-bottom: 0.8rem;"><strong><span style="color:var(--neon-red); font-weight:bold;">Vuoto</span>:</strong> Slot di servizio non ancora assegnato.</li>
+        <li style="margin-bottom: 0.8rem;"><strong><span style="color:var(--text-muted); font-weight:bold;">N.D.</span>:</strong> Slot non disponibile o non previsto per quella tipologia di servizio.</li>
         
+        <li style="margin-bottom: 0.8rem; margin-top: 1.5rem;"><strong>Classificazione Rapporto Milite:</strong>
+          <ul style="list-style: none; padding-left: 1rem; margin-top: 0.5rem;">
+            <li style="margin-bottom: 0.4rem;"><strong style="color:#00f2fe;">[V]</strong> : Volontario standard.</li>
+            <li style="margin-bottom: 0.4rem;"><strong style="color:#ff007f;">[D]</strong> : Dipendente dell'Associazione.</li>
+          </ul>
+        </li>
+
         <li style="margin-bottom: 0.8rem; margin-top: 1.5rem;"><strong>Icone Azioni Amministrative (Dashboard Responsabile):</strong>
           <ul style="list-style: none; padding-left: 1rem; margin-top: 0.5rem;">
-            <li style="margin-bottom: 0.4rem;"><span style="color:var(--neon-green); font-size: 1.1rem; vertical-align: middle;">➕</span> <strong>[Ins.]</strong> (Icona Verde): Inserimento nuovo volontario nello slot.</li>
-            <li style="margin-bottom: 0.4rem;"><span style="color:var(--neon-orange); font-size: 1.1rem; vertical-align: middle;">🔄</span> <strong>[Spos.]</strong> (Icona Arancio): Spostamento/Cambio turno.</li>
-            <li style="margin-bottom: 0.4rem;"><span style="color:var(--neon-red); font-size: 1.1rem; vertical-align: middle;">❌</span> <strong>[Rim.]</strong> (Icona Rossa): Rimozione volontario dallo slot.</li>
-            <li style="margin-bottom: 0.4rem;"><span style="color:#38bdf8; font-size: 1.1rem; vertical-align: middle;">✓</span> <strong>[Conv.]</strong> (Icona Azzurra): Conferma ufficiale del turno (Convalida).</li>
+            <li style="margin-bottom: 0.4rem;"><span style="color:var(--neon-green); font-size: 1.1rem; vertical-align: middle;">➕</span> <strong>[Ins.]</strong> (Icona Verde): Inserimento milite nello slot tramite ricerca testuale/per ruolo.</li>
+            <li style="margin-bottom: 0.4rem;"><span style="color:var(--neon-orange); font-size: 1.1rem; vertical-align: middle;">🔄</span> <strong>[Spos.]</strong> (Icona Arancio): Attiva lo spostamento del milite. Consente di ricollocarlo cliccando su uno slot "Destina qui" idoneo senza rimuoverlo.</li>
+            <li style="margin-bottom: 0.4rem;"><span style="color:#00f2fe; font-size: 1.1rem; vertical-align: middle;">✏️</span> <strong>[Mod. Ora]</strong> (Icona Matita Azzurra): Consente di editare puntualmente l'orario di fine del singolo turno assegnato.</li>
+            <li style="margin-bottom: 0.4rem;"><span style="color:var(--neon-red); font-size: 1.1rem; vertical-align: middle;">❌</span> <strong>[Rim.]</strong> (Icona Rossa): Rimozione volontario dallo slot assegnato.</li>
+            <li style="margin-bottom: 0.4rem;"><span style="color:#38bdf8; font-size: 1.1rem; vertical-align: middle;">✓</span> <strong>[Conv.]</strong> (Icona Azzurra): Convalida e conferma ufficiale del turno per l'equipaggio.</li>
           </ul>
         </li>
+
         <li style="margin-top: 1.5rem; margin-bottom: 0.8rem;"><strong>Acronimi Operativi:</strong>
           <ul style="list-style: disc; padding-left: 1.5rem; margin-top: 0.5rem;">
-            <li><strong>AUT:</strong> Autista (Personale abilitato alla conduzione dei mezzi).</li>
-            <li><strong>RIF:</strong> Caposquadra / Riferimento (Responsabile sanitario dell'equipaggio).</li>
-            <li><strong>SOC:</strong> Soccorritore (Volontario certificato addetto al trattamento).</li>
-            <li><strong>ALL:</strong> Allievo (Milite in prova o in affiancamento).</li>
+            <li><strong>AUT:</strong> Autista (Qualifica 'Autista MSB' ed abilitazione 'SSE' obbligatorie).</li>
+            <li><strong>RIF:</strong> Caposquadra / Riferimento (Qualifica 'Socc. Referente per SOREU' ed abilitazione 'SSE' obbligatorie).</li>
+            <li><strong>SOC:</strong> Soccorritore (Qualifica 'Soccorritore' ed abilitazione 'SSE' obbligatorie).</li>
+            <li><strong>ALL:</strong> Allievo (Posto riservato a 'allievo/a').</li>
           </ul>
         </li>
-        <li style="margin-bottom: 0.8rem; margin-top: 1.5rem;"><strong>🟢 Highlight Verde / Bordo Neon:</strong> Evidenziazione visiva applicata in tempo reale ESCLUSIVAMENTE sul singolo slot orario in cui l'utente attualmente loggato è di servizio.</li>
+        <li style="margin-bottom: 0.8rem; margin-top: 1.5rem;"><strong>🟢 Highlight Verde / Bordo Neon:</strong> Evidenziazione visiva del singolo slot orario in cui l'utente loggato è di servizio.</li>
+        <li style="margin-bottom: 0.8rem; margin-top: 0.8rem;"><strong>⚠️ Scoperture parziali e Gap:</strong> Se un ruolo presenta dei buchi di copertura oraria rispetto al servizio richiesto, viene visualizzato un avviso arancione con il dettaglio orario (es. <em>"⚠️ Scoperto: 18:00-19:00"</em>).</li>
       </ul>
 
-      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">3. RUOLI E MATRICE DEI PERMESSI</h3>
+      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">3. VINCOLO COMPLIANCE DELLE 11 ORE DI RIPOSO</h3>
+      <p style="color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
+        Il sistema integra un motore di validazione per rispettare i riposi obbligatori di 11 ore tra un turno e l'altro:<br>
+        - **Funzionamento:** Impedisce l'iscrizione autonoma o l'assegnazione se l'intervallo tra la fine di un turno e l'inizio del successivo è inferiore a 11 ore.<br>
+        - **Gestione Flessibile:** Il Superadmin può configurare il vincolo separatamente per <strong>Volontari</strong> e <strong>Dipendenti</strong>, e decidere se applicarlo o meno alle azioni manuali degli <strong>Amministratori</strong>.
+      </p>
+
+      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">4. NOTIFICHE PUSH E MESSAGGISTICA</h3>
+      <p style="color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
+        È disponibile il sistema di notifiche push istantanee per smartphone e browser desktop:<br>
+        - **Attivazione:** È possibile attivare/sincronizzare manualmente i permessi cliccando su <em>"🔔 Attiva Notifiche"</em> nel pannello superiore.<br>
+        - **Notifiche a schermo spento:** Se installata come PWA, l'applicazione riceverà gli avvisi di chiamata importanti e le convocazioni emettendo un segnale acustico speciale anche in background.<br>
+        - **Messaggi:** Consente di consultare lo storico dei messaggi inviati dagli amministratori. I responsabili possono inviare comunicazioni a singoli utenti o a tutto il personale (`ALL`) sfruttando template preimpostati.
+      </p>
+
+      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">5. MATRICE PERMESSI E RUOLI</h3>
       <ul style="list-style: none; padding: 0; color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
         <li style="margin-bottom: 1rem;">
-          <strong style="color: var(--neon-green);">Volontario (Stato 1 e 2):</strong> Visualizzazione del Calendario Mensile. Accesso alla Sidebar Dinamica per analizzare i turni (Stato 1) o per filtrare il tabellone mostrando esclusivamente i propri turni personali (Stato 2).
+          <strong style="color: var(--neon-green);">Volontario (Stato 1 e 2):</strong> Visualizzazione del Calendario Mensile. Filtro per mostrare esclusivamente i propri turni personali (Stato 2) e auto-iscrizione diretta immediata nei posti liberi idonei.
         </li>
         <li style="margin-bottom: 1rem;">
-          <strong style="color: #38bdf8;">Admin:</strong> Eredita tutte le funzioni del Volontario. Gestione operativa del pannello di pianificazione per inserire, spostare, validare o cancellare i volontari dai singoli slot e gestire la copertura delle criticità.
+          <strong style="color: #38bdf8;">Admin:</strong> Gestione del tabellone (inserimento manuale, spostamento, modifica orari e convalida dei turni). Gestione delle comunicazioni e dei messaggi.
         </li>
         <li style="margin-bottom: 1rem;">
-          <strong style="color: var(--neon-red);">Superadmin (AgoGio):</strong> Controllo totale e insindacabile. Accesso in esclusiva all'<strong>Anagrafica Volontari</strong> (modifica asincrona in tempo reale dei ruoli utente) e configurazione token Kiosk.
+          <strong style="color: var(--neon-red);">Superadmin (AgoGio):</strong> Controllo totale dell'applicazione. Accesso al pannello <em>Anagrafica Volontari</em> per la modifica dei ruoli in tempo reale, gestione dei vincoli orari di riposo (11 ore) per Volontari/Dipendenti, configurazione token Kiosk e strumenti di manutenzione database. Il pannello Superadmin può essere compresso per ottimizzare lo spazio.
         </li>
         <li style="margin-bottom: 1rem;">
-          <strong style="color: var(--neon-orange);">Modalità Kiosk (Stato 3):</strong> Monitor fisso di Sede. Accesso automatizzato (senza credenziali manuali) tramite URL dedicato Magic Link. Mostra una versione in sola lettura a schermo intero del tabellone. Utilizza il font <em>Century Gothic grassetto</em> e colora di <strong>VERDE</strong> brillante i nomi dell'equipaggio attivo.
+          <strong style="color: var(--neon-orange);">Modalità Kiosk (Stato 3):</strong> Modalità visualizzazione per monitor fisso in sede (tramite Magic Link). Layout ottimizzato ad alta leggibilità in font <em>Century Gothic grassetto</em> che colora in <strong>VERDE brillante</strong> i nominativi dell'equipaggio in servizio attivo.
         </li>
       </ul>
 
-      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">4. ISTRUZIONI DI ACCESSO E SICUREZZA</h3>
+      <h3 style="color: var(--neon-orange); border-bottom: 1px solid rgba(255, 126, 103, 0.3); padding-bottom: 0.5rem; margin-top: 2rem;">6. ISTRUZIONI DI ACCESSO E SICUREZZA</h3>
       <p style="color: var(--text-main); font-size: 0.95rem; line-height: 1.6;">
-        Per accedere, inserisci la tua <strong>Matricola numerica</strong> e la <strong>Password di default</strong> fornita dalla segreteria.<br><br>
-        <span style="color: var(--neon-red); font-weight: bold;">AVVISO OBBLIGATORIO:</span> <em>Al primo accesso è TASSATIVO modificare la password di default dal proprio profilo per poter sbloccare le funzionalità operative del sistema.</em>
+        Per accedere, inserisci la tua <strong>Matricola numerica</strong> e la <strong>Password</strong>.<br>
+        <strong>Come installare su iOS Safari:</strong> Premi il tasto Condividi (📤), scorri l'elenco e seleziona <strong>"Aggiungi alla schermata Home"</strong>. Apri l'app dall'icona creata sulla schermata Home.<br>
+        <span style="color: var(--neon-red); font-weight: bold;">AVVISO OBBLIGATORIO:</span> <em>Al primo accesso è TASSATIVO modificare la password di default dal proprio profilo.</em>
       </p>
 
       <div style="text-align: center; margin-top: 2.5rem;">
@@ -188,7 +298,7 @@
     </div>
   </div>
 
-  <script type="module" src="login.js?v=1.8.27"></script>
-  <script type="module" src="messaging_service.js?v=1.8.27"></script>
+  <script type="module" src="login.js?v=1.8.32"></script>
+  <script type="module" src="messaging_service.js?v=1.8.32"></script>
 </body>
 </html>

@@ -367,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (isSuperForPanel) {
           if (superadminPanel) {
               superadminPanel.style.display = 'block';
-              // Render plain checkboxes (no .switch dependency) for maximum reliability
+              // Render plain checkboxes and dropdown for maximum reliability
               superadminPanel.innerHTML = `
                 <div style="padding: 15px; background: rgba(255, 255, 255, 0.03); border: 1px solid #00f2fe; border-radius: 8px; margin-bottom: 15px;">
                     <h4 style="color: #00f2fe; margin: 0 0 10px 0; font-size: 1rem; text-transform: uppercase;">Gestione Vincoli Orari 11h</h4>
@@ -382,6 +382,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 10px; margin-top: 4px;">
                         <label style="color: #ffcc00; font-size: 0.9rem;">⚠️ Applica regola anche agli Admin</label>
                         <input type="checkbox" id="toggle-regola-admin" style="transform: scale(1.2); cursor: pointer;">
+                    </div>
+                </div>
+                <div style="padding: 15px; background: rgba(255, 255, 255, 0.03); border: 1px solid #00ffcc; border-radius: 8px; margin-bottom: 15px; margin-top: 15px;">
+                    <h4 style="color: #00ffcc; margin: 0 0 10px 0; font-size: 1rem; text-transform: uppercase;">Configurazione Promemoria Turni</h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <label style="color: #fff; font-size: 0.95rem;">Giorni di preavviso per reminder</label>
+                        <select id="select-reminder-giorni" style="background: #1a1a24; color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; padding: 4px; font-size: 0.9rem; outline: none; cursor: pointer; width: 150px;">
+                            <option value="1">1 giorno prima (Default)</option>
+                            <option value="2">2 giorni prima</option>
+                            <option value="3">3 giorni prima</option>
+                            <option value="4">4 giorni prima</option>
+                            <option value="5">5 giorni prima</option>
+                        </select>
                     </div>
                 </div>
                 <div style="padding: 15px; background: rgba(255, 255, 255, 0.03); border: 1px solid #ff0055; border-radius: 8px; margin-top: 15px;">
@@ -399,10 +412,11 @@ document.addEventListener('DOMContentLoaded', () => {
           const toggleVolontari = document.getElementById('toggle-riposo-volontari');
           const toggleDipendenti = document.getElementById('toggle-riposo-dipendenti');
           const toggleRegoleAdmin = document.getElementById('toggle-regola-admin');
+          const selectReminderGiorni = document.getElementById('select-reminder-giorni');
           const btnSvuotaTurni = document.getElementById('btn-svuota-turni');
           const btnSvuotaComunicazioni = document.getElementById('btn-svuota-comunicazioni');
 
-          if (toggleVolontari && toggleDipendenti && toggleRegoleAdmin) {
+          if (toggleVolontari && toggleDipendenti && toggleRegoleAdmin && selectReminderGiorni) {
               if (activeUnsubscribes.regole_riposo) activeUnsubscribes.regole_riposo();
               activeUnsubscribes.regole_riposo = onSnapshot(doc(db, "impostazioni", "regole_riposo"), async (snap) => {
                   if (snap.exists()) {
@@ -410,13 +424,15 @@ document.addEventListener('DOMContentLoaded', () => {
                       toggleVolontari.checked = !!data.controllaRiposoVolontari;
                       toggleDipendenti.checked = !!data.controllaRiposoDipendenti;
                       toggleRegoleAdmin.checked = !!data.applicaRegoleAdmin;
+                      selectReminderGiorni.value = String(data.giorniPreavvisoReminder || 1);
                   } else {
                       // Document doesn't exist yet — initialize with safe defaults
                       try {
                           await setDoc(doc(db, "impostazioni", "regole_riposo"), {
                               controllaRiposoVolontari: true,
                               controllaRiposoDipendenti: false,
-                              applicaRegoleAdmin: false
+                              applicaRegoleAdmin: false,
+                              giorniPreavvisoReminder: 1
                           });
                       } catch (initErr) {
                           console.error("Errore inizializzazione impostazioni:", initErr);
@@ -429,7 +445,8 @@ document.addEventListener('DOMContentLoaded', () => {
                       await updateDoc(doc(db, "impostazioni", "regole_riposo"), {
                           controllaRiposoVolontari: toggleVolontari.checked,
                           controllaRiposoDipendenti: toggleDipendenti.checked,
-                          applicaRegoleAdmin: toggleRegoleAdmin.checked
+                          applicaRegoleAdmin: toggleRegoleAdmin.checked,
+                          giorniPreavvisoReminder: parseInt(selectReminderGiorni.value, 10) || 1
                       });
                   } catch(e) {
                       console.error("Errore update regole riposo", e);
@@ -440,6 +457,7 @@ document.addEventListener('DOMContentLoaded', () => {
               toggleVolontari.addEventListener('change', updateRules);
               toggleDipendenti.addEventListener('change', updateRules);
               toggleRegoleAdmin.addEventListener('change', updateRules);
+              selectReminderGiorni.addEventListener('change', updateRules);
           } else {
               console.warn("[SUPERADMIN] Toggle elements not found after innerHTML inject. Check #superadmin-rules-panel.");
           }
@@ -993,6 +1011,44 @@ document.addEventListener('DOMContentLoaded', () => {
                     log_modifiche: arrayUnion(logEntry)
                 });
 
+                if (mod.payloadModifica.nuovoStato === 'CONVALIDATO') {
+                    ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(ruoloKey => {
+                        const slots = newEq[ruoloKey] || [];
+                        const slotArr = Array.isArray(slots) ? slots : Object.values(slots);
+                        slotArr.forEach(vol => {
+                            if (vol && vol.matricola) {
+                                const msgRef = doc(collection(db, "comunicazioni_turni"));
+                                const nomeRuolo = ruoloKey.replace(/_/g, ' ').toUpperCase();
+                                
+                                let dataTurnoFmt = mod.turnoVecchio.data;
+                                try {
+                                    const parts = mod.turnoVecchio.data.split('-');
+                                    if (parts.length === 3) {
+                                        dataTurnoFmt = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                    }
+                                } catch (e) {}
+
+                                const msgPayload = {
+                                    mittente_matricola: String(currentAdminUser.matricola).trim(),
+                                    destinatario_matricola: String(vol.matricola).trim(),
+                                    testo: `Il tuo turno del ${dataTurnoFmt} (${vol.inizio}-${vol.fine}) come ${nomeRuolo} è stato CONVALIDATO dall'amministratore.`,
+                                    tipo: "convalida_turno",
+                                    timestamp: new Date().toISOString(),
+                                    letto: false,
+                                    turno_id: String(mod.idTurno).trim(),
+                                    notifica: {
+                                        richiede_push: true,
+                                        urgente: false,
+                                        suono: "default",
+                                        titolo: "Turno Convalidato"
+                                    }
+                                };
+                                batch.set(msgRef, msgPayload);
+                            }
+                        });
+                    });
+                }
+
                 logNotifiche.push({
                     turno_id: mod.idTurno,
                     azione_admin: mod.azione,
@@ -1096,7 +1152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                       const slot = newDestEq[r];
                       if (!slot) return false;
                       const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
-                      return slotArr.some(m => String(m.matricola) === volMatricolaStr);
+                      return slotArr.some(m => m && m.matricola && String(m.matricola) === volMatricolaStr);
                   });
                   if (giaIscrittoInAltroRuolo) throw "SLOT_DOPPIO_RUOLO";
 
@@ -1363,7 +1419,7 @@ document.addEventListener('DOMContentLoaded', () => {
               const slot = turnoObj.equipaggio_attuale?.[r];
               if (!slot) return false;
               const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
-              return slotArr.some(a => String(a.matricola) === String(v.matricola));
+              return slotArr.some(a => a && a.matricola && String(a.matricola) === String(v.matricola));
           });
           if (giaNelTurno) return false;
       }
@@ -1429,7 +1485,7 @@ document.addEventListener('DOMContentLoaded', () => {
               const slot = currentEq[r];
               if (!slot) return false;
               const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
-              return slotArr.some(m => String(m.matricola) === userMatricolaStr);
+              return slotArr.some(m => m && m.matricola && String(m.matricola) === userMatricolaStr);
           });
           if (giaIscrittoInAltroRuolo) {
               throw "Il volontario è già assegnato a un altro ruolo in questo turno.";

@@ -143,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
               const slot = turno.equipaggio_attuale?.[r];
               if (!slot) return false;
               const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
-              return slotArr.some(a => String(a.matricola) === String(u.id) || String(a.matricola) === String(u.matricola));
+              return slotArr.some(a => a && a.matricola && (String(a.matricola) === String(u.id) || String(a.matricola) === String(u.matricola)));
           });
           if (giaNelTurno) return;
 
@@ -751,14 +751,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? Object.values(old).filter(v => v && typeof v === 'object' && v.matricola) 
                     : [];
             }
-            // Validazione: controlla che il volontario non sia già assegnato a un altro ruolo nello stesso turno
             const matricolaStr = String(matricola).trim();
             const giaIscrittoInAltroRuolo = ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].some(r => {
                 if (r === ruolo) return false;
                 const slot = equipaggio[r];
                 if (!slot) return false;
                 const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
-                return slotArr.some(m => String(m.matricola) === matricolaStr);
+                return slotArr.some(m => m && m.matricola && String(m.matricola) === matricolaStr);
             });
             if (giaIscrittoInAltroRuolo) throw "Il volontario è già assegnato a un altro ruolo in questo turno.";
 
@@ -821,7 +820,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const slot = equipaggio[r];
                 if (!slot) return false;
                 const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
-                return slotArr.some(m => String(m.matricola) === matricolaStr);
+                return slotArr.some(m => m && m.matricola && String(m.matricola) === matricolaStr);
             });
             if (giaIscrittoInAltroRuolo) throw "Sei già iscritto a questo turno con un altro ruolo.";
 
