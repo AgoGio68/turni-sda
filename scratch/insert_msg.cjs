@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const serviceAccount = require("../new-key.json");
+const serviceAccount = require("../turni-sda-firebase-adminsdk-fbsvc-7aa3fc5b70.json");
 
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -12,7 +12,7 @@ const db = admin.firestore();
 async function run() {
     const payload = {
         mittente_matricola: "admin_test",
-        destinatario_matricola: "34",
+        destinatario_matricola: "034",
         testo: "Messaggio di test per debug push notification!",
         tipo: "comunicazione_generica",
         timestamp: new Date().toISOString(),

@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const serviceAccount = require("../new-key.json");
+const serviceAccount = require("../turni-sda-firebase-adminsdk-fbsvc-7aa3fc5b70.json");
 
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -7,7 +7,7 @@ if (!admin.apps.length) {
     });
 }
 
-const token = "dmUfBBnyUv24fH6kfXyc8Q:APA91bGiHLvI4rbyX9JdPTlYXxJvMsJlqfP6mUHQkI6bA3kDKXs49Eq3m23vbwaCsmZFyvwAfPyrx0WkWKut564WenOby3lt3gViyLAS9VvgblQbo2wlssI";
+const token = "e6Re_Q1ajwvsw9B4ywgh_B:APA91bETgyev4RnCwxUR-cacifaqF_ETYn2r4mXIEbDhNJvBwoFo_nOdQU7YyQDCIgWJdRWhiPwK4FlExyuGbN2YmuUJVRN37qMwMqHuiNAu0rWrhI8PHYY";
 
 const payload = {
     notification: {

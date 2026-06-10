@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const serviceAccount = require("../new-key.json");
+const serviceAccount = require("../turni-sda-firebase-adminsdk-fbsvc-7aa3fc5b70.json");
 
 if (!admin.apps.length) {
     admin.initializeApp({

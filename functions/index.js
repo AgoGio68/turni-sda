@@ -62,7 +62,7 @@ exports.inviaNotificaPushEmergenza = onDocumentCreated("comunicazioni_turni/{idM
             return null;
         }
 
-        // Payload nativo strutturato esattamente per attivare popup e suono su Android/iOS
+        // Payload nativo strutturato esattamente per attivare popup e suono su Android/iOS/Web
         const payload = {
             notification: {
                 title: titolo,
@@ -73,6 +73,18 @@ exports.inviaNotificaPushEmergenza = onDocumentCreated("comunicazioni_turni/{idM
                     aps: {
                         sound: "default"
                     }
+                }
+            },
+            webpush: {
+                headers: {
+                    Urgency: "high"
+                },
+                notification: {
+                    title: titolo,
+                    body: testo,
+                    icon: "/assets/icons/icon-192x192.png",
+                    badge: "/assets/icons/icon-72x72.png",
+                    requireInteraction: true
                 }
             },
             data: {
@@ -87,10 +99,18 @@ exports.inviaNotificaPushEmergenza = onDocumentCreated("comunicazioni_turni/{idM
             tokens: tokens,
             notification: payload.notification,
             data: payload.data,
-            apns: payload.apns
+            apns: payload.apns,
+            webpush: payload.webpush
         });
         
-        console.log(`[FCM_SERVER] Inviati con successo ${response.successCount} messaggi push.`);
+        console.log(`[FCM_SERVER] Inviati con successo ${response.successCount} messaggi push su ${tokens.length}.`);
+        if (response.failureCount > 0) {
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    console.warn(`[FCM_SERVER] Errore invio a token ${tokens[idx]}:`, resp.error);
+                }
+            });
+        }
         return null;
     } catch (error) {
         console.error("[FCM_SERVER_ERROR] Errore durante l'invio del push:", error);
