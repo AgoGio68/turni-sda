@@ -12,9 +12,29 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Force immediate activation of new SW versions
+self.addEventListener('install', (event) => {
+    console.log('[SW] Installing new version...');
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+    console.log('[SW] Activating new version...');
+    event.waitUntil(clients.claim());
+});
+
 messaging.onBackgroundMessage((payload) => {
-    console.log("[SW_BACKGROUND] Ricevuta notifica push in background:", payload);
-    // Nessuna azione manuale: delegato interamente al sistema operativo
+    console.log('[SW_BACKGROUND] Ricevuta notifica push in background:', payload);
+    const title = payload.notification?.title || payload.data?.title || 'Nuovo Messaggio';
+    const body = payload.notification?.body || payload.data?.body || '';
+    const options = {
+        body,
+        icon: '/assets/icons/icon-192x192.png',
+        badge: '/assets/icons/icon-72x72.png',
+        requireInteraction: true,
+        data: { url: '/' }
+    };
+    return self.registration.showNotification(title, options);
 });
 
 self.addEventListener("notificationclick", (event) => {

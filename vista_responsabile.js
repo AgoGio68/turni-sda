@@ -64,38 +64,27 @@ if (superadminHeader) {
 const superadminTbody = document.querySelector('#superadmin-table tbody');
 const adminInfo = document.getElementById('admin-info');
 
+// Utility: sanitizza testo per prevenire XSS nell'innerHTML
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   
-  // 1. RBAC & Firebase Auth
-  const isSuperAdminOverride = localStorage.getItem('superadmin_override') === 'true';
-  
-  if (isSuperAdminOverride) {
-      currentAdminUser = { matricola: 'agogio', nome: 'Ago', cognome: 'Gio', is_admin: true, superadmin: true };
-      adminInfo.innerHTML = `Admin: SUPERADMIN <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
-      document.getElementById('logout-btn').addEventListener('click', () => {
-          localStorage.removeItem('superadmin_override');
-          signOut(auth).catch(() => {});
-          window.location.href = "index.html";
-      });
-      
-      superadminSection.style.display = 'block';
-      initSuperadminPanel();
-      initApp();
-      return;
-  }
+  // 1. RBAC & Firebase Auth — SEMPRE tramite onAuthStateChanged, nessun bypass
 
   onAuthStateChanged(auth, async (user) => {
     try {
       if (user) {
         const matricola = user.email.split('@')[0];
         
-        // Controllo Superadmin AgoGio fallback (se auth persistito ma no localStorage)
+        // Controllo Superadmin AgoGio (verificato tramite Firebase Auth, nessun bypass)
         if (matricola.toLowerCase() === 'agogio') {
-            localStorage.setItem('superadmin_override', 'true');
             currentAdminUser = { matricola: 'agogio', nome: 'Ago', cognome: 'Gio', is_admin: true, superadmin: true };
             adminInfo.innerHTML = `Admin: SUPERADMIN <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
             document.getElementById('logout-btn').addEventListener('click', () => {
-                localStorage.removeItem('superadmin_override');
                 signOut(auth);
                 window.location.href = "index.html";
             });
@@ -112,17 +101,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Clean up old temporary window debug hooks if present
                 if (window.currentAdminUser) delete window.currentAdminUser;
 
-                // 1. Extract and sanitize all verification tokens
+                // Verifica superadmin dal campo Firestore o dal login noto
                 const rawMatricola = currentAdminUser && currentAdminUser.matricola ? String(currentAdminUser.matricola).trim() : "";
-                const safeFiscalCode = currentAdminUser && currentAdminUser.cod_fiscale ? String(currentAdminUser.cod_fiscale).trim().toUpperCase() : "";
 
-                // 2. Multi-possibility evaluation (Matricola variants OR absolute unique Fiscal Code match)
-                const isSuper = (
-                    rawMatricola === "34" || 
-                    rawMatricola === "034" || 
-                    parseInt(rawMatricola, 10) === 34 || 
-                    safeFiscalCode === "GSTGRG68E03A745K"
-                );
+                // Superadmin determinato da Firestore field oppure da matricola nota (senza PII nel client)
+                const isSuper = !!snap.data().superadmin || rawMatricola === "34" || rawMatricola === "034";
 
                 // 3. UI Execution state
                 if (isSuper) {
@@ -351,18 +334,10 @@ document.addEventListener('DOMContentLoaded', () => {
           });
       });
       // =====================================================================
-      // PHASE 2: BULLETPROOF GATEKEEPER — multi-criteria isSuper evaluation
-      // Covers: matricola "34", legacy "034", parseInt fallback, and Fiscal Code
+      // PHASE 2: Superadmin panel gating — basato sul flag calcolato a login
       // =====================================================================
       const superadminPanel = document.getElementById('superadmin-rules-panel');
-      const rawMatricolaCheck = currentAdminUser ? String(currentAdminUser.matricola || '').trim() : '';
-      const safeFiscalCodeCheck = currentAdminUser ? String(currentAdminUser.cod_fiscale || '').trim().toUpperCase() : '';
-      const isSuperForPanel = (
-          rawMatricolaCheck === "34" ||
-          rawMatricolaCheck === "034" ||
-          parseInt(rawMatricolaCheck, 10) === 34 ||
-          safeFiscalCodeCheck === "GSTGRG68E03A745K"
-      );
+      const isSuperForPanel = !!(currentAdminUser && currentAdminUser.superadmin);
 
       if (isSuperForPanel) {
           if (superadminPanel) {
@@ -963,55 +938,78 @@ document.addEventListener('DOMContentLoaded', () => {
       const confermaEInviaNotifiche = async () => {
         if(modificheSospese.length === 0) return;
         
-        console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Salvataggio massivo batch`);
+        console.log(`[DEBUG_DB] INIZIO_OPERAZIONE: Salvataggio transazionale per ${modificheSospese.length} turni`);
 
-        try {
-            const batch = writeBatch(db);
-            const logNotifiche = [];
+        let successCount = 0;
+        let failCount = 0;
+        const logNotifiche = [];
 
-            for (const mod of modificheSospese) {
-                const newEq = mod.payloadModifica.nuovoEquipaggio || {};
-
-                // Validazione preventiva per evitare il salvataggio di ruoli duplicati
-                const seenMatricole = new Set();
-                let overlapFound = false;
-                let overlapName = "";
-                ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(r => {
-                    const slot = newEq[r];
-                    if (!slot) return;
-                    const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
-                    slotArr.forEach(m => {
-                        if (m && m.matricola) {
-                            const matr = String(m.matricola).trim();
-                            if (seenMatricole.has(matr)) {
-                                overlapFound = true;
-                                overlapName = m.nominativo || matr;
-                            }
-                            seenMatricole.add(matr);
-                        }
-                    });
-                });
-                if (overlapFound) {
-                    alert(`Impossibile salvare: Il volontario (${overlapName}) risulta assegnato a più ruoli in uno dei turni modificati.`);
-                    return;
-                }
-
+        for (const mod of modificheSospese) {
+            try {
                 const turnoRef = doc(db, "turni", mod.idTurno);
                 
-                const logEntry = {
-                    timestamp: String(mod.timestamp).trim(),
-                    autore: String(currentAdminUser.matricola).trim(), // Usa vero utente admin
-                    azione: String(mod.azione).trim(),
-                    notifica_inviata: true
-                };
-                
-                batch.update(turnoRef, {
-                    equipaggio_attuale: mod.payloadModifica.nuovoEquipaggio,
-                    stato_turno: mod.payloadModifica.nuovoStato,
-                    log_modifiche: arrayUnion(logEntry)
+                await runTransaction(db, async (transaction) => {
+                    // Rileggi il documento dal server per evitare sovrascritture stale
+                    const turnoSnap = await transaction.get(turnoRef);
+                    if (!turnoSnap.exists()) throw "Il turno non esiste più.";
+                    
+                    const currentData = turnoSnap.data();
+                    const currentEq = currentData.equipaggio_attuale || {};
+                    let finalEq;
+                    let finalStato = mod.payloadModifica.nuovoStato;
+
+                    if (finalStato === 'CONVALIDATO') {
+                        // Convalida: applica convalidato_da_admin a TUTTI i membri attuali (freschi dal server)
+                        finalEq = { ...currentEq };
+                        ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(r => {
+                            if (finalEq[r] && Array.isArray(finalEq[r])) {
+                                finalEq[r] = finalEq[r].map(a => ({ ...a, convalidato_da_admin: true }));
+                            }
+                        });
+
+                        // Validazione overlap: verifica che nessun volontario sia in 2 ruoli
+                        const seenMatricole = new Set();
+                        let overlapFound = false;
+                        let overlapName = "";
+                        ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(r => {
+                            const slot = finalEq[r];
+                            if (!slot) return;
+                            const slotArr = Array.isArray(slot) ? slot : Object.values(slot);
+                            slotArr.forEach(m => {
+                                if (m && m.matricola) {
+                                    const matr = String(m.matricola).trim();
+                                    if (seenMatricole.has(matr)) {
+                                        overlapFound = true;
+                                        overlapName = m.nominativo || matr;
+                                    }
+                                    seenMatricole.add(matr);
+                                }
+                            });
+                        });
+                        if (overlapFound) throw `Volontario ${overlapName} in più ruoli.`;
+                    } else {
+                        // Per altre azioni: usa l'equipaggio dalla modifica staged
+                        finalEq = mod.payloadModifica.nuovoEquipaggio;
+                    }
+
+                    const logEntry = {
+                        timestamp: String(mod.timestamp).trim(),
+                        autore: String(currentAdminUser.matricola).trim(),
+                        azione: String(mod.azione).trim(),
+                        notifica_inviata: true
+                    };
+
+                    transaction.update(turnoRef, {
+                        equipaggio_attuale: finalEq,
+                        stato_turno: finalStato,
+                        log_modifiche: arrayUnion(logEntry)
+                    });
                 });
 
+                // Notifiche di convalida (fuori dalla transazione, sono create nuove)
                 if (mod.payloadModifica.nuovoStato === 'CONVALIDATO') {
+                    const newEq = mod.payloadModifica.nuovoEquipaggio || {};
+                    const notifBatch = writeBatch(db);
                     ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(ruoloKey => {
                         const slots = newEq[ruoloKey] || [];
                         const slotArr = Array.isArray(slots) ? slots : Object.values(slots);
@@ -1043,37 +1041,39 @@ document.addEventListener('DOMContentLoaded', () => {
                                         titolo: "Turno Convalidato"
                                     }
                                 };
-                                batch.set(msgRef, msgPayload);
+                                notifBatch.set(msgRef, msgPayload);
                             }
                         });
                     });
+                    await notifBatch.commit();
                 }
 
+                successCount++;
                 logNotifiche.push({
                     turno_id: mod.idTurno,
                     azione_admin: mod.azione,
                     data_turno: mod.turnoVecchio.data,
                     payload_push: `Turno del ${mod.turnoVecchio.data}: Variazione applicata da ${currentAdminUser.nome}.`
                 });
+            } catch (err) {
+                failCount++;
+                console.error(`[TRANSAZIONE] Errore per turno ${mod.idTurno}:`, err);
             }
-
-            console.log(`[DEBUG_DB] DATA_INVIO: Esecuzione batch.commit()`);
-            await batch.commit();
-            console.log(`[DEBUG_DB] CONFERMA_FIRESTORE: Batch completato`);
-
-            console.log("=========================================");
-            console.log("🔔 PAYLOAD NOTIFICHE PUSH / EMAIL GENERATO");
-            console.log("=========================================");
-            console.log(JSON.stringify(logNotifiche, null, 2));
-
-            alert(`Operazione Completata.\n${modificheSospese.length} modifiche salvate in database. Notifiche iniettate.`);
-            
-            modificheSospese = [];
-            updateStagingUI();
-        } catch (err) {
-            console.error("Errore critico durante la WriteBatch:", err);
-            alert("Si è verificato un problema di comunicazione con Firestore.");
         }
+
+        console.log("=========================================");
+        console.log("🔔 PAYLOAD NOTIFICHE PUSH / EMAIL GENERATO");
+        console.log("=========================================");
+        console.log(JSON.stringify(logNotifiche, null, 2));
+
+        if (failCount === 0) {
+            alert(`Operazione Completata.\n${successCount} modifiche salvate in database. Notifiche iniettate.`);
+        } else {
+            alert(`Attenzione: ${successCount} modifiche salvate, ${failCount} fallite (possibile conflitto concorrente). Le modifiche fallite non sono state applicate.`);
+        }
+        
+        modificheSospese = [];
+        updateStagingUI();
       };
 
       document.getElementById('btn-save').addEventListener('click', confermaEInviaNotifiche);
@@ -1353,9 +1353,12 @@ document.addEventListener('DOMContentLoaded', () => {
     modalLoading.style.display = 'block';
     
     try {
-      if (!allVolunteersCache) {
+      // Ricarica la cache se è stata invalidata o è più vecchia di 5 minuti
+      const now = Date.now();
+      if (!allVolunteersCache || !allVolunteersCache._ts || (now - allVolunteersCache._ts > 5 * 60 * 1000)) {
         const snap = await getDocs(collection(db, "utenti"));
         allVolunteersCache = snap.docs.map(d => d.data());
+        allVolunteersCache._ts = now;
       }
       console.log("--- DEBUG STRUTTURA VOLONTARIO ---");
       if (allVolunteersCache.length > 0) {
@@ -1569,14 +1572,15 @@ document.addEventListener("DOMContentLoaded", () => {
             listContainer.innerHTML = messaggi.map(msg => {
                 const borderNeon = msg.letto ? 'rgba(255,255,255,0.05)' : '1px solid #ff0055';
                 const bgState = msg.letto ? 'rgba(255,255,255,0.02)' : 'rgba(255, 0, 85, 0.05)';
+                const testoSicuro = escapeHtml(msg.testo || '');
                 
                 return `
                     <div class="msg-card" data-id="${msg.id}" style="background: ${bgState}; border: 1px solid ${borderNeon}; border-radius: 6px; padding: 12px; margin-bottom: 10px; transition: all 0.2s;">
                         <div style="font-size: 11px; color: #888; margin-bottom: 5px; display: flex; justify-content: space-between;">
-                            <span>Da: Matr. ${msg.mittente_matricola}</span>
+                            <span>Da: Matr. ${escapeHtml(msg.mittente_matricola || '')}</span>
                             <span>${new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                         </div>
-                        <div style="font-size: 13px; color: #e0e0e0; line-height: 1.4; word-break: break-word;">${msg.testo}</div>
+                        <div style="font-size: 13px; color: #e0e0e0; line-height: 1.4; word-break: break-word;">${testoSicuro}</div>
                         ${!msg.letto ? `<button class="mark-read-btn" data-id="${msg.id}" style="margin-top: 8px; background: transparent; border: 1px solid #00ffcc; color: #00ffcc; border-radius: 4px; font-size: 10px; padding: 2px 6px; cursor: pointer;">Segna come letto</button>` : ''}
                     </div>
                 `;

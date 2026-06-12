@@ -47,14 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let utentiCache = null; // Cache lista volontari per il modal admin
   
   let configLive = { controllaRiposoVolontari: true, controllaRiposoDipendenti: false, applicaRegoleAdmin: false };
-  onSnapshot(doc(db, "impostazioni", "regole_riposo"), (snap) => {
-      if (snap.exists()) {
-          const data = snap.data();
-          configLive.controllaRiposoVolontari = !!data.controllaRiposoVolontari;
-          configLive.controllaRiposoDipendenti = !!data.controllaRiposoDipendenti;
-          configLive.applicaRegoleAdmin = !!data.applicaRegoleAdmin;
-      }
-  });
+  let configUnsubscribe = null;
 
   // Elementi DOM mappati singolarmente
   const userInfoDiv = document.getElementById('user-info');
@@ -224,11 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let isTvMode = isKioskMode;
 
   if (!isKioskMode) {
-      const isSuperAdminOverride = localStorage.getItem('superadmin_override') === 'true';
-      if (isSuperAdminOverride) {
-          window.location.href = "vista_responsabile.html";
-          return;
-      }
+      // Nessun bypass: tutti gli utenti passano per onAuthStateChanged
   }
 
   // =====================================================
@@ -824,6 +813,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (giaIscrittoInAltroRuolo) throw "Sei già iscritto a questo turno con un altro ruolo.";
 
+            // Validazione: controlla duplicato nello STESSO ruolo (previene double-click race)
+            const giaNelloStessoRuolo = equipaggio[ruolo].some(m => String(m.matricola) === matricolaStr);
+            if (giaNelloStessoRuolo) throw "Sei già iscritto a questo ruolo in questo turno.";
+
             console.log("[DEBUG_DB] DATA_INVIO:", nuovoMembro);
             equipaggio[ruolo].push(nuovoMembro);
             transaction.update(docRef, { equipaggio_attuale: equipaggio });
@@ -928,9 +921,20 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (matricola.toLowerCase() === 'agogio') {
-           localStorage.setItem('superadmin_override', 'true');
            window.location.href = "vista_responsabile.html";
            return;
+        }
+        
+        // Avvia il listener delle configurazioni (dopo auth confermata)
+        if (!configUnsubscribe) {
+            configUnsubscribe = onSnapshot(doc(db, "impostazioni", "regole_riposo"), (snap) => {
+                if (snap.exists()) {
+                    const data = snap.data();
+                    configLive.controllaRiposoVolontari = !!data.controllaRiposoVolontari;
+                    configLive.controllaRiposoDipendenti = !!data.controllaRiposoDipendenti;
+                    configLive.applicaRegoleAdmin = !!data.applicaRegoleAdmin;
+                }
+            });
         }
 
         const snap = await getDoc(doc(db, "utenti", matricola));
@@ -1046,14 +1050,20 @@ document.addEventListener('DOMContentLoaded', () => {
               listContainer.innerHTML = messaggi.map(msg => {
                   const borderNeon = msg.letto ? 'rgba(255,255,255,0.05)' : '1px solid #ff0055';
                   const bgState = msg.letto ? 'rgba(255,255,255,0.02)' : 'rgba(255, 0, 85, 0.05)';
+                  const testoSafe = document.createElement('span');
+                  testoSafe.textContent = msg.testo || '';
+                  const testoEscaped = testoSafe.innerHTML;
+                  const mittenteSafe = document.createElement('span');
+                  mittenteSafe.textContent = msg.mittente_matricola || '';
+                  const mittenteEscaped = mittenteSafe.innerHTML;
                   
                   return `
                       <div class="msg-card" style="background: ${bgState}; border: 1px solid ${borderNeon}; border-radius: 6px; padding: 12px; margin-bottom: 10px;">
                           <div style="font-size: 11px; color: #888; margin-bottom: 5px; display: flex; justify-content: space-between;">
-                              <span>Da: Direzione (Matr. ${msg.mittente_matricola})</span>
+                              <span>Da: Direzione (Matr. ${mittenteEscaped})</span>
                               <span>${new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                           </div>
-                          <div style="font-size: 13px; color: #e0e0e0; line-height: 1.4; word-break: break-word;">${msg.testo}</div>
+                          <div style="font-size: 13px; color: #e0e0e0; line-height: 1.4; word-break: break-word;">${testoEscaped}</div>
                           ${!msg.letto ? `<button class="vol-mark-read-btn" data-id="${msg.id}" style="margin-top: 8px; background: transparent; border: 1px solid #00ffcc; color: #00ffcc; border-radius: 4px; font-size: 10px; padding: 2px 6px; cursor: pointer;">Segna come letto</button>` : ''}
                       </div>
                   `;

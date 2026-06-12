@@ -76,11 +76,11 @@ window.AppMessaging = {
             const permission = await Notification.requestPermission();
             if (permission === "granted") {
                 // Registra esplicitamente il Service Worker di background
-                const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js").catch(() => null);
+                const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js", { updateViaCache: 'none' }).catch(() => null);
                 
                 if (registration) {
-                    // Timeout di sicurezza per permettere lo stato attivo del Service Worker
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    // Attendi che il Service Worker sia attivo
+                    await navigator.serviceWorker.ready;
 
                     const currentToken = await getToken(messaging, { 
                         vapidKey: VAPID_KEY,
@@ -97,6 +97,26 @@ window.AppMessaging = {
                             piattaforma: "web_browser"
                         }, { merge: true });
                         console.log("[FCM] Sincronizzazione completata con successo per la matricola:", matricolaUtente);
+
+                        // Refresh token periodically (every 6 hours) to prevent token rot
+                        setInterval(async () => {
+                            try {
+                                const refreshedToken = await getToken(messaging, { 
+                                    vapidKey: VAPID_KEY,
+                                    serviceWorkerRegistration: registration 
+                                });
+                                if (refreshedToken && refreshedToken !== currentToken) {
+                                    await setDoc(doc(db, "dispositivi_notifiche", String(refreshedToken).trim()), {
+                                        matricola: String(matricolaUtente).trim(),
+                                        ultimo_aggiornamento: new Date().toISOString(),
+                                        piattaforma: "web_browser"
+                                    }, { merge: true });
+                                    console.log('[FCM] Token aggiornato automaticamente.');
+                                }
+                            } catch (e) {
+                                console.warn('[FCM] Errore refresh periodico token:', e);
+                            }
+                        }, 6 * 60 * 60 * 1000); // 6 hours
                     }
                 }
             }
@@ -106,9 +126,26 @@ window.AppMessaging = {
     listenInForeground: () => {
         if (!messaging) return;
         onMessage(messaging, (payload) => {
+            const title = payload.notification?.title || 'AVVISO URGENTE';
+            const body = payload.notification?.body || payload.data?.body || '';
+
+            // Play alarm sound (best-effort, requires user interaction)
             const audio = new Audio("assets/audio/alarm.mp3");
             audio.play().catch(() => console.log("Audio in primo piano condizionato dalle interazioni utente."));
-            alert(`🚨 ${payload.notification?.title || 'AVVISO URGENTE'}\n\n${payload.notification?.body || payload.data?.body || ''}`);
+
+            // Use Notification API instead of blocking alert()
+            if (Notification.permission === 'granted') {
+                const notification = new Notification(`🚨 ${title}`, {
+                    body,
+                    icon: '/assets/icons/icon-192x192.png',
+                    badge: '/assets/icons/icon-72x72.png',
+                    requireInteraction: true
+                });
+                notification.onclick = () => {
+                    window.focus();
+                    notification.close();
+                };
+            }
         });
     }
 };

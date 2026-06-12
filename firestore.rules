@@ -1,15 +1,93 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // EXCEPTION FIRST: Allow public access to the messaging system so console tests can pass without Firebase Auth
-    match /comunicazioni_turni/{document=**} {
-      allow read, write: if true;
+
+    // =====================================================
+    //  COMUNICAZIONI TURNI — Solo utenti autenticati
+    //  Ogni utente può leggere i propri messaggi e quelli broadcast (ALL).
+    //  Ogni utente autenticato può creare messaggi.
+    //  Solo il destinatario può segnare come letto.
+    //  Nessuno può cancellare messaggi dal client.
+    // =====================================================
+    match /comunicazioni_turni/{msgId} {
+      allow create: if request.auth != null;
+
+      allow read: if request.auth != null
+        && (
+          resource.data.destinatario_matricola == request.auth.token.email.split('@')[0]
+          || resource.data.destinatario_matricola == 'ALL'
+          || resource.data.mittente_matricola == request.auth.token.email.split('@')[0]
+        );
+
+      // Permetti update solo del campo 'letto' da parte del destinatario
+      allow update: if request.auth != null
+        && resource.data.destinatario_matricola == request.auth.token.email.split('@')[0]
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['letto']);
+
+      allow delete: if false;
     }
-    
-    // GLOBAL CATCH-ALL SECOND: Restrict everything else to authenticated users
-    match /{document=**} {
+
+    // =====================================================
+    //  TURNI — Lettura per tutti gli autenticati, scrittura per tutti
+    //  (la validazione fine-grained del ruolo admin è gestita lato
+    //   applicazione perché non usiamo Custom Claims al momento)
+    // =====================================================
+    match /turni/{turnoId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // =====================================================
+    //  UTENTI — Ogni utente può leggere tutti i profili.
+    //  Ogni utente può scrivere SOLO il proprio profilo,
+    //  ma NON può auto-modificare i campi di privilegio.
+    // =====================================================
+    match /utenti/{matricola} {
+      allow read: if request.auth != null;
+
+      // L'utente può scrivere il proprio profilo ma NON auto-promuoversi
+      allow update: if request.auth != null
+        && request.auth.token.email.split('@')[0] == matricola
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['is_admin', 'superadmin', 'ruolo']);
+
+      // Merge-write per last_active (presenza) — qualsiasi admin autenticato
+      allow update: if request.auth != null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['last_active']);
+
+      allow create: if false;
+      allow delete: if false;
+    }
+
+    // =====================================================
+    //  IMPOSTAZIONI — Lettura per tutti, scrittura controllata
+    // =====================================================
+    match /impostazioni/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // =====================================================
+    //  DISPOSITIVI NOTIFICHE — Ogni utente gestisce i propri token
+    // =====================================================
+    match /dispositivi_notifiche/{tokenId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // =====================================================
+    //  SPOSTAMENTI ATTIVI — Solo admin autenticati
+    // =====================================================
+    match /spostamenti_attivi/{adminId} {
       allow read, write: if request.auth != null;
+    }
+
+    // =====================================================
+    //  CATCH-ALL: Nega tutto il resto
+    // =====================================================
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

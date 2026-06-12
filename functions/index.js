@@ -108,6 +108,13 @@ exports.inviaNotificaPushEmergenza = onDocumentCreated("comunicazioni_turni/{idM
             response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
                     console.warn(`[FCM_SERVER] Errore invio a token ${tokens[idx]}:`, resp.error);
+                    const errorCode = resp.error?.code;
+                    if (errorCode === 'messaging/registration-token-not-registered' || errorCode === 'messaging/invalid-registration-token') {
+                        console.log(`[FCM_SERVER] Token non valido, rimozione documento: ${tokens[idx]}`);
+                        admin.firestore().collection('dispositivi_notifiche').doc(tokens[idx]).delete().catch(delErr => {
+                            console.error(`[FCM_SERVER] Errore durante la rimozione del token ${tokens[idx]}:`, delErr);
+                        });
+                    }
                 }
             });
         }
@@ -168,6 +175,25 @@ exports.inviaReminderTurni = onSchedule({
             return null;
         }
         
+        // REFACTORING-06: Pre-fetch all existing reminders in bulk instead of N+1 queries
+        const turnoIds = turniSnap.docs.map(d => d.id);
+        const sentReminderKeys = new Set();
+        
+        // Firestore 'in' operator supports max 30 values, so chunk if needed
+        for (let i = 0; i < turnoIds.length; i += 30) {
+            const chunk = turnoIds.slice(i, i + 30);
+            const existingSnap = await db.collection('comunicazioni_turni')
+                .where('tipo', '==', 'reminder_turno')
+                .where('turno_id', 'in', chunk)
+                .get();
+            existingSnap.forEach(doc => {
+                const d = doc.data();
+                if (d.destinatario_matricola && d.turno_id) {
+                    sentReminderKeys.add(`${d.destinatario_matricola}_${d.turno_id}`);
+                }
+            });
+        }
+        
         const promises = [];
         
         for (const docSnap of turniSnap.docs) {
@@ -188,13 +214,8 @@ exports.inviaReminderTurni = onSchedule({
                         const orarioInizio = vol.inizio || turnoData.orario?.inizio || "08:00";
                         const orarioFine = vol.fine || turnoData.orario?.fine || "14:00";
                         
-                        const checkMsg = await db.collection("comunicazioni_turni")
-                            .where("destinatario_matricola", "==", matricola)
-                            .where("tipo", "==", "reminder_turno")
-                            .where("turno_id", "==", turnoId)
-                            .get();
-                            
-                        if (!checkMsg.empty) {
+                        const reminderKey = `${matricola}_${turnoId}`;
+                        if (sentReminderKeys.has(reminderKey)) {
                             console.log(`[REMINDER] Reminder già inviato in precedenza a ${nominativo} (${matricola}) per il turno ${turnoId}`);
                             continue;
                         }
