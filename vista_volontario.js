@@ -11,7 +11,7 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 */
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, query, onSnapshot, doc, getDoc, getDocs, runTransaction } from "firebase/firestore";
+import { getFirestore, collection, query, onSnapshot, doc, getDoc, getDocs, runTransaction, addDoc, deleteDoc } from "firebase/firestore";
 import { verificaIscrizione, validaRiposi } from './regole_iscrizione.js';
 import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo, calcolaBuchiRuolo } from './utils.js';
 
@@ -39,10 +39,13 @@ document.addEventListener('DOMContentLoaded', () => {
   //  STATO GLOBALE SOTTO UN UNICO SCOPE CHIUSO
   // =====================================================
   let turniList = [];
+  let disponibilitaList = [];
   let currentSelectedDate = null;
   let currentFilter = 'focus'; 
+  let currentView = 'ufficiale'; 
   let currentUser = null;
   let activeUnsubscribeTurni = null;
+  let activeUnsubscribeDisponibilita = null;
   let isUpdating = false;
   let utentiCache = null; // Cache lista volontari per il modal admin
   
@@ -57,7 +60,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const bsTitle = document.getElementById('bs-title');
   const bsContent = document.getElementById('bs-content');
   const btnCloseDetails = document.getElementById('btn-close-details');
-  const filterButtons = document.querySelectorAll('.filter-btn');
+  const filterButtons = document.querySelectorAll('#container-filtri-ufficiali .filter-btn');
+  const btnViewUfficiale = document.getElementById('btn-view-ufficiale');
+  const btnViewDisponibilita = document.getElementById('btn-view-disponibilita');
+  const containerFiltriUfficiali = document.getElementById('container-filtri-ufficiali');
   const btnTv = document.getElementById('btn-tv-mode');
 
   // Elementi DOM del modal picker volontario
@@ -277,6 +283,24 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   });
 
+  if (btnViewUfficiale && btnViewDisponibilita) {
+      btnViewUfficiale.addEventListener('click', () => {
+          btnViewDisponibilita.classList.remove('active');
+          btnViewUfficiale.classList.add('active');
+          if (containerFiltriUfficiali) containerFiltriUfficiali.style.display = 'block';
+          currentView = 'ufficiale';
+          renderMacroCalendar();
+      });
+
+      btnViewDisponibilita.addEventListener('click', () => {
+          btnViewUfficiale.classList.remove('active');
+          btnViewDisponibilita.classList.add('active');
+          if (containerFiltriUfficiali) containerFiltriUfficiali.style.display = 'none';
+          currentView = 'disponibilita';
+          renderMacroCalendar();
+      });
+  }
+
   if (isKioskMode) {
       currentFilter = 'tabellone';
       document.body.classList.add('tv-mode');
@@ -378,12 +402,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const renderMacroCalendar = () => {
     calendar.innerHTML = '';
-    let turniDaRendere = turniList;
-    if (currentFilter === 'miei') {
-        turniDaRendere = turniList.filter(t => getUserRoleInShift(t) !== null);
-    }
     
-    const turniPerData = turniDaRendere.reduce((acc, turno) => {
+    // Raccoglie tutte le date dai turni per creare la griglia
+    const turniPerData = turniList.reduce((acc, turno) => {
         if(!acc[turno.data]) acc[turno.data] = [];
         acc[turno.data].push(turno);
         return acc;
@@ -391,166 +412,316 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const dateOrdinate = Object.keys(turniPerData).sort();
 
-    if (dateOrdinate.length === 0 && currentFilter === 'miei') {
-        calendar.innerHTML = '<p style="color:var(--text-muted); grid-column: 1 / -1; text-align:center; padding: 2rem;">Non sei iscritto a nessun turno al momento.</p>';
-        return;
-    }
-
-    dateOrdinate.forEach(dataString => {
-      const turniDelGiorno = turniPerData[dataString];
-      const card = document.createElement('div');
-      card.className = 'day-card';
-      
-      let myRolesPerFascia = { M: null, P: null, N: null };
-      let isMyDay = false;
-      turniDelGiorno.forEach(t => {
-          const role = getUserRoleInShift(t);
-          if (role) {
-              isMyDay = true;
-              const oraI = parseInt((t.orario?.inizio || '08:00').split(':')[0]);
-              const f = oraI < 13 ? 'M' : (oraI < 19 ? 'P' : 'N');
-              myRolesPerFascia[f] = role;
-          }
-      });
-      
-      if (isMyDay) card.classList.add('my-shift');
-      
-      let badgeClass = 'incompleto';
-      let statoDay = 'Aperto';
-      let allFull = true;
-      let anyCritical = false;
-      let fasce = { M: null, P: null, N: null };
-
-      turniDelGiorno.forEach(t => {
-          const eq = t.equipaggio_attuale || {};
-          const req = t.requisiti_equipaggio || {};
-          const inizioTurno = t.orario?.inizio || "00:00";
-          const fineTurno = t.orario?.fine || "00:00";
-          const aut = !req.autista_richiesto || calcolaCoperturaRuolo(eq.autista, inizioTurno, fineTurno).isFull;
-          const ref = !req.referente_richiesto || calcolaCoperturaRuolo(eq.referente_soreu, inizioTurno, fineTurno).isFull;
-          const soc = !req.soccorritore_richiesto || calcolaCoperturaRuolo(eq.soccorritore, inizioTurno, fineTurno).isFull;
-
-          const isCritico = !aut || !ref || !soc;
-          const isFull = aut && ref && soc;
-
-          if (isCritico) anyCritical = true;
-          if (!isFull) allFull = false;
-
-          const oraInizio = parseInt((t.orario?.inizio || "08:00").split(':')[0]);
-          let fascia = oraInizio < 13 ? 'M' : (oraInizio < 19 ? 'P' : 'N');
-          let color = isCritico ? 'rosso' : (isFull ? 'verde' : 'giallo');
+    if (currentView === 'ufficiale') {
+        let turniDaRendere = turniList;
+        if (currentFilter === 'miei') {
+            turniDaRendere = turniList.filter(t => getUserRoleInShift(t) !== null);
+        }
+        
+        const filteredTurniPerData = turniDaRendere.reduce((acc, turno) => {
+            if(!acc[turno.data]) acc[turno.data] = [];
+            acc[turno.data].push(turno);
+            return acc;
+        }, {});
+        
+        const filteredDates = Object.keys(filteredTurniPerData).sort();
+        
+        if (filteredDates.length === 0 && currentFilter === 'miei') {
+            calendar.innerHTML = '<p style="color:var(--text-muted); grid-column: 1 / -1; text-align:center; padding: 2rem;">Non sei iscritto a nessun turno al momento.</p>';
+            return;
+        }
+        
+        filteredDates.forEach(dataString => {
+          const turniDelGiorno = filteredTurniPerData[dataString];
+          const card = document.createElement('div');
+          card.className = 'day-card';
           
-          if(fasce[fascia] === 'rosso') color = 'rosso'; 
-          else if(fasce[fascia] === 'giallo' && color === 'verde') color = 'giallo';
-          fasce[fascia] = color;
-      });
-
-      if(anyCritical) { badgeClass = 'critico'; statoDay = 'Incompleto'; }
-      else if(allFull) { badgeClass = 'pieno'; statoDay = 'Completo'; }
-
-      const formattedDate = `${dataString.split('-')[2]}/${dataString.split('-')[1]}`;
-      let inlineCardsHTML = '';
-      
-      if (currentFilter === 'miei' || currentFilter === 'tabellone') {
-          const turniOrdGiorno = turniDelGiorno.sort((a,b) => (a.orario?.inizio||'').localeCompare(b.orario?.inizio||''));
-          inlineCardsHTML = turniOrdGiorno.map(t => {
-              const myRole = getUserRoleInShift(t);
-              const tipo = (t.tipo_servizio||'').replace(/_/g, ' ');
-              const cardClass = myRole ? 'inline-shift-card my-shift-inline' : 'inline-shift-card';
-              const roleBadge = myRole ? `<span class="my-role-badge">${myRole}</span>` : '';
-              return `
-                  <div class="${cardClass}">
-                      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
-                          <span><strong style="font-size:0.7rem; color:var(--text-muted);">${tipo}</strong> ${roleBadge}</span>
-                          <span style="font-size:0.7rem; color:var(--text-muted);">🕒 ${t.orario?.inizio}-${t.orario?.fine}</span>
+          let myRolesPerFascia = { M: null, P: null, N: null };
+          let isMyDay = false;
+          turniDelGiorno.forEach(t => {
+              const role = getUserRoleInShift(t);
+              if (role) {
+                  isMyDay = true;
+                  const oraI = parseInt((t.orario?.inizio || '08:00').split(':')[0]);
+                  const f = oraI < 13 ? 'M' : (oraI < 19 ? 'P' : 'N');
+                  myRolesPerFascia[f] = role;
+              }
+          });
+          
+          if (isMyDay) card.classList.add('my-shift');
+          
+          let badgeClass = 'incompleto';
+          let statoDay = 'Aperto';
+          let allFull = true;
+          let anyCritical = false;
+          let fasce = { M: null, P: null, N: null };
+    
+          turniDelGiorno.forEach(t => {
+              const eq = t.equipaggio_attuale || {};
+              const req = t.requisiti_equipaggio || {};
+              const inizioTurno = t.orario?.inizio || "00:00";
+              const fineTurno = t.orario?.fine || "00:00";
+              const aut = !req.autista_richiesto || calcolaCoperturaRuolo(eq.autista, inizioTurno, fineTurno).isFull;
+              const ref = !req.referente_richiesto || calcolaCoperturaRuolo(eq.referente_soreu, inizioTurno, fineTurno).isFull;
+              const soc = !req.soccorritore_richiesto || calcolaCoperturaRuolo(eq.soccorritore, inizioTurno, fineTurno).isFull;
+    
+              const isCritico = !aut || !ref || !soc;
+              const isFull = aut && ref && soc;
+    
+              if (isCritico) anyCritical = true;
+              if (!isFull) allFull = false;
+    
+              const oraInizio = parseInt((t.orario?.inizio || "08:00").split(':')[0]);
+              let fascia = oraInizio < 13 ? 'M' : (oraInizio < 19 ? 'P' : 'N');
+              let color = isCritico ? 'rosso' : (isFull ? 'verde' : 'giallo');
+              
+              if(fasce[fascia] === 'rosso') color = 'rosso'; 
+              else if(fasce[fascia] === 'giallo' && color === 'verde') color = 'giallo';
+              fasce[fascia] = color;
+          });
+    
+          if(anyCritical) { badgeClass = 'critico'; statoDay = 'Incompleto'; }
+          else if(allFull) { badgeClass = 'pieno'; statoDay = 'Completo'; }
+    
+          const formattedDate = `${dataString.split('-')[2]}/${dataString.split('-')[1]}`;
+          let inlineCardsHTML = '';
+          
+          if (currentFilter === 'miei' || currentFilter === 'tabellone') {
+              const turniOrdGiorno = turniDelGiorno.sort((a,b) => (a.orario?.inizio||'').localeCompare(b.orario?.inizio||''));
+              inlineCardsHTML = turniOrdGiorno.map(t => {
+                  const myRole = getUserRoleInShift(t);
+                  const tipo = (t.tipo_servizio||'').replace(/_/g, ' ');
+                  const cardClass = myRole ? 'inline-shift-card my-shift-inline' : 'inline-shift-card';
+                  const roleBadge = myRole ? `<span class="my-role-badge">${myRole}</span>` : '';
+                  return `
+                      <div class="${cardClass}">
+                          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+                              <span><strong style="font-size:0.7rem; color:var(--text-muted);">${tipo}</strong> ${roleBadge}</span>
+                              <span style="font-size:0.7rem; color:var(--text-muted);">🕒 ${t.orario?.inizio}-${t.orario?.fine}</span>
+                          </div>
+                          <ul class="inline-crew-list">${renderInlineEquipaggio(t)}</ul>
                       </div>
-                      <ul class="inline-crew-list">${renderInlineEquipaggio(t)}</ul>
-                  </div>
+                  `;
+              }).join('');
+          }
+          
+          if (currentFilter === 'focus') {
+              const microBarRow = (label, fasciaKey) => {
+                  const myRole = myRolesPerFascia[fasciaKey];
+                  const badgeHTML = myRole ? ` <span class="my-role-badge">${myRole}</span>` : '';
+                  return `
+                      <span class="micro-bar-label">${label}${badgeHTML}</span>
+                      <div class="micro-bar ${fasce[fasciaKey] || ''} ${myRole ? 'my-micro-bar' : ''}"></div>
+                  `;
+              };
+              card.innerHTML = `
+                <strong style="font-size: 1.25rem; text-shadow: 0 0 5px rgba(255,255,255,0.2);">${formattedDate}</strong>
+                <span class="badge ${badgeClass}" style="margin-top: 0.25rem; font-size: 0.65rem;">${statoDay}</span>
+                <div class="micro-bars">
+                    ${microBarRow('Mattina', 'M')}
+                    ${microBarRow('Pomeriggio', 'P')}
+                    ${microBarRow('Notte', 'N')}
+                </div>
               `;
-          }).join('');
-      }
-      
-      if (currentFilter === 'focus') {
-          const microBarRow = (label, fasciaKey) => {
-              const myRole = myRolesPerFascia[fasciaKey];
-              const badgeHTML = myRole ? ` <span class="my-role-badge">${myRole}</span>` : '';
-              return `
-                  <span class="micro-bar-label">${label}${badgeHTML}</span>
-                  <div class="micro-bar ${fasce[fasciaKey] || ''} ${myRole ? 'my-micro-bar' : ''}"></div>
+          } else {
+              card.innerHTML = `
+                <strong style="font-size: 1.25rem; text-shadow: 0 0 5px rgba(255,255,255,0.2);">${formattedDate}</strong>
+                <span class="badge ${badgeClass}" style="margin-top: 0.25rem; font-size: 0.65rem;">${statoDay}</span>
+                ${inlineCardsHTML}
               `;
-          };
-          card.innerHTML = `
-            <strong style="font-size: 1.25rem; text-shadow: 0 0 5px rgba(255,255,255,0.2);">${formattedDate}</strong>
-            <span class="badge ${badgeClass}" style="margin-top: 0.25rem; font-size: 0.65rem;">${statoDay}</span>
-            <div class="micro-bars">
-                ${microBarRow('Mattina', 'M')}
-                ${microBarRow('Pomeriggio', 'P')}
-                ${microBarRow('Notte', 'N')}
+          }
+    
+          card.addEventListener('click', () => {
+            currentSelectedDate = dataString;
+            renderMicroDay(dataString);
+            bottomSheet.classList.add('active');
+            bsOverlay.classList.add('active');
+            if (btnCloseDetails) btnCloseDetails.classList.add('active');
+          });
+          calendar.appendChild(card);
+        });
+    } else {
+        // VISTA DISPONIBILITÀ
+        dateOrdinate.forEach(dataString => {
+          const card = document.createElement('div');
+          card.className = 'day-card';
+          
+          const dispGiorno = disponibilitaList.filter(d => d.data === dataString);
+          const autisti = dispGiorno.filter(d => d.ruolo === 'autista').length;
+          const referenti = dispGiorno.filter(d => d.ruolo === 'referente_soreu').length;
+          const soccorritori = dispGiorno.filter(d => d.ruolo === 'soccorritore').length;
+          const allievi = dispGiorno.filter(d => d.ruolo === 'allievo_quarto_posto').length;
+          
+          const myMatricola = currentUser ? String(currentUser.matricola) : '';
+          const isMeCandidate = dispGiorno.some(d => String(d.matricola) === myMatricola);
+          
+          if (isMeCandidate) {
+              card.classList.add('my-shift'); // Evidenzia la card se c'è la mia candidatura
+          }
+          
+          let listHTML = `
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem; text-align:left; line-height:1.3;">
+              <div style="${autisti > 0 ? 'color:#00ffcc; font-weight:bold;' : ''}">🚑 Autisti: ${autisti}</div>
+              <div style="${referenti > 0 ? 'color:#00ffcc; font-weight:bold;' : ''}">📞 Referenti: ${referenti}</div>
+              <div style="${soccorritori > 0 ? 'color:#00ffcc; font-weight:bold;' : ''}">🎒 Op. DAE: ${soccorritori}</div>
+              <div style="${allievi > 0 ? 'color:#00ffcc; font-weight:bold;' : ''}">🔰 Allievi: ${allievi}</div>
             </div>
           `;
-      } else {
+          
+          const formattedDate = `${dataString.split('-')[2]}/${dataString.split('-')[1]}`;
+          
           card.innerHTML = `
             <strong style="font-size: 1.25rem; text-shadow: 0 0 5px rgba(255,255,255,0.2);">${formattedDate}</strong>
-            <span class="badge ${badgeClass}" style="margin-top: 0.25rem; font-size: 0.65rem;">${statoDay}</span>
-            ${inlineCardsHTML}
+            <span class="badge" style="margin-top: 0.25rem; font-size: 0.65rem; background:rgba(0, 255, 204, 0.15); color:#00ffcc; border:1px solid rgba(0, 255, 204, 0.3);">DISPONIBILITÀ</span>
+            ${listHTML}
           `;
-      }
-
-      card.addEventListener('click', () => {
-        currentSelectedDate = dataString;
-        renderMicroDay(dataString);
-        bottomSheet.classList.add('active');
-        bsOverlay.classList.add('active');
-        if (btnCloseDetails) btnCloseDetails.classList.add('active');
-      });
-      calendar.appendChild(card);
-    });
+          
+          card.addEventListener('click', () => {
+            currentSelectedDate = dataString;
+            renderMicroDay(dataString);
+            bottomSheet.classList.add('active');
+            bsOverlay.classList.add('active');
+            if (btnCloseDetails) btnCloseDetails.classList.add('active');
+          });
+          calendar.appendChild(card);
+        });
+    }
   };
 
   const renderMicroDay = (dataString) => {
-    bsTitle.textContent = `Turni del ${dataString.split('-').reverse().join('/')}`;
+    const dataFmt = dataString.split('-').reverse().join('/');
+    bsTitle.textContent = currentView === 'ufficiale' ? `Turni del ${dataFmt}` : `Disponibilità del ${dataFmt}`;
     bsContent.innerHTML = '';
-    const turniDelGiorno = turniList.filter(t => t.data === dataString).sort((a,b) => (a.orario?.inizio||'').localeCompare(b.orario?.inizio||''));
 
-    if(turniDelGiorno.length === 0) {
-        bsContent.innerHTML = '<p style="color:var(--text-muted)">Nessun turno previsto per questa giornata.</p>';
-        return;
-    }
+    if (currentView === 'ufficiale') {
+        const turniDelGiorno = turniList.filter(t => t.data === dataString).sort((a,b) => (a.orario?.inizio||'').localeCompare(b.orario?.inizio||''));
 
-    turniDelGiorno.forEach(turno => {
-        const card = document.createElement('div');
-        card.className = 'shift-card';
-        const eq = turno.equipaggio_attuale || {};
-        const req = turno.requisiti_equipaggio || {};
+        if(turniDelGiorno.length === 0) {
+            bsContent.innerHTML = '<p style="color:var(--text-muted)">Nessun turno previsto per questa giornata.</p>';
+            return;
+        }
 
-        let currentStato = turno.stato_turno || 'APERTO';
-        const inizioTurno = turno.orario?.inizio || "00:00";
-        const fineTurno = turno.orario?.fine || "00:00";
-        const aut = !req.autista_richiesto || calcolaCoperturaRuolo(eq.autista, inizioTurno, fineTurno).isFull;
-        const ref = !req.referente_richiesto || calcolaCoperturaRuolo(eq.referente_soreu, inizioTurno, fineTurno).isFull;
-        const soc = !req.soccorritore_richiesto || calcolaCoperturaRuolo(eq.soccorritore, inizioTurno, fineTurno).isFull;
-        
-        if (!aut || !ref || !soc) currentStato = 'INCOMPLETO';
-        else if (currentStato !== 'CONVALIDATO') currentStato = 'COMPLETO';
-        const bgClass = (currentStato === 'COMPLETO' || currentStato === 'CONVALIDATO') ? 'pieno' : 'critico';
+        turniDelGiorno.forEach(turno => {
+            const card = document.createElement('div');
+            card.className = 'shift-card';
+            const eq = turno.equipaggio_attuale || {};
+            const req = turno.requisiti_equipaggio || {};
 
-        card.innerHTML = `
-            <div class="shift-header">
-                <div>
-                    <strong style="color:var(--text-main); font-size:1.1rem; letter-spacing: 0.5px;">${(turno.tipo_servizio||'').replace(/_/g, ' ')}</strong><br>
-                    <span style="color:var(--text-muted); font-size:0.9rem;">🕒 ${turno.orario?.inizio} - ${turno.orario?.fine}</span>
+            let currentStato = turno.stato_turno || 'APERTO';
+            const inizioTurno = turno.orario?.inizio || "00:00";
+            const fineTurno = turno.orario?.fine || "00:00";
+            const aut = !req.autista_richiesto || calcolaCoperturaRuolo(eq.autista, inizioTurno, fineTurno).isFull;
+            const ref = !req.referente_richiesto || calcolaCoperturaRuolo(eq.referente_soreu, inizioTurno, fineTurno).isFull;
+            const soc = !req.soccorritore_richiesto || calcolaCoperturaRuolo(eq.soccorritore, inizioTurno, fineTurno).isFull;
+            
+            if (!aut || !ref || !soc) currentStato = 'INCOMPLETO';
+            else if (currentStato !== 'CONVALIDATO') currentStato = 'COMPLETO';
+            const bgClass = (currentStato === 'COMPLETO' || currentStato === 'CONVALIDATO') ? 'pieno' : 'critico';
+
+            card.innerHTML = `
+                <div class="shift-header">
+                    <div>
+                        <strong style="color:var(--text-main); font-size:1.1rem; letter-spacing: 0.5px;">${(turno.tipo_servizio||'').replace(/_/g, ' ')}</strong><br>
+                        <span style="color:var(--text-muted); font-size:0.9rem;">🕒 ${turno.orario?.inizio} - ${turno.orario?.fine}</span>
+                    </div>
+                    <span class="badge ${bgClass}">${currentStato}</span>
                 </div>
-                <span class="badge ${bgClass}">${currentStato}</span>
-            </div>
-            <div class="shift-slots">
-                ${renderSlotRow(turno, 'autista', 'AUTISTA', eq.autista, req.autista_richiesto, '🚑')}
-                ${renderSlotRow(turno, 'referente_soreu', 'SOCC. REFERENTE SOREU', eq.referente_soreu, req.referente_richiesto, '📞')}
-                ${renderSlotRow(turno, 'soccorritore', 'OPERATORE DAE', eq.soccorritore, req.soccorritore_richiesto, '🎒')}
-                ${renderSlotRow(turno, 'allievo_quarto_posto', 'ALLIEVO 4° POSTO', eq.allievo_quarto_posto, req.allievo_consentito, '🔰')}
+                <div class="shift-slots">
+                    ${renderSlotRow(turno, 'autista', 'AUTISTA', eq.autista, req.autista_richiesto, '🚑')}
+                    ${renderSlotRow(turno, 'referente_soreu', 'SOCC. REFERENTE SOREU', eq.referente_soreu, req.referente_richiesto, '📞')}
+                    ${renderSlotRow(turno, 'soccorritore', 'OPERATORE DAE', eq.soccorritore, req.soccorritore_richiesto, '🎒')}
+                    ${renderSlotRow(turno, 'allievo_quarto_posto', 'ALLIEVO 4° POSTO', eq.allievo_quarto_posto, req.allievo_consentito, '🔰')}
+                </div>
+            `;
+            bsContent.appendChild(card);
+        });
+    } else {
+        // SCHERMATA DETTAGLI DISPONIBILITÀ
+        const dispGiorno = disponibilitaList.filter(d => d.data === dataString);
+        
+        // 1. Lista disponibilità inserite
+        const listCard = document.createElement('div');
+        listCard.className = 'shift-card';
+        listCard.style.padding = '1.25rem';
+        
+        let listHTML = `<h3 style="margin-top:0; color:var(--text-main); font-size:1.1rem;">Disponibilità Inserite</h3>`;
+        if (dispGiorno.length === 0) {
+            listHTML += `<p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:0;">Nessun volontario si è ancora proposto per questo giorno.</p>`;
+        } else {
+            listHTML += `<div style="display:flex; flex-direction:column; gap:0.6rem; margin-bottom:0.5rem;">`;
+            dispGiorno.forEach(d => {
+                const isMe = String(d.matricola) === String(currentUser?.matricola);
+                const ruoloFmt = d.ruolo.replace(/_/g, ' ').toUpperCase();
+                const icon = d.ruolo === 'autista' ? '🚑' : (d.ruolo === 'referente_soreu' ? '📞' : (d.ruolo === 'soccorritore' ? '🎒' : '🔰'));
+                const deleteBtn = isMe ? `<button class="btn-remove-disp" data-id="${d.id}" title="Cancella la mia disponibilità" style="background:transparent; border:none; cursor:pointer; margin-left:0.5rem; font-size:1rem; padding:0;">❌</button>` : '';
+                
+                listHTML += `
+                    <div class="slot-row slot-prenotato" style="margin: 0; padding: 0.6rem; border-radius: 6px;">
+                        <div class="slot-info">
+                            <span class="slot-icon">${icon}</span>
+                            <div>
+                                <div style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">${ruoloFmt}</div>
+                                <div style="font-weight:600; color:${isMe ? '#00f2fe' : '#fff'}; font-size:1rem;">
+                                    ${isMe ? 'Tu' : formattaNomeDisplay(d.nominativo)} [${d.orario?.inizio}-${d.orario?.fine}] ${deleteBtn}
+                                </div>
+                            </div>
+                        </div>
+                        <span class="status-badge status-wait" style="background: rgba(255, 204, 0, 0.15); color: #ffcc00; border-color: rgba(255, 204, 0, 0.3);">[Pendente]</span>
+                    </div>
+                `;
+            });
+            listHTML += `</div>`;
+        }
+        listCard.innerHTML = listHTML;
+        bsContent.appendChild(listCard);
+        
+        // Aggiungi event listener per pulsanti elimina
+        listCard.querySelectorAll('.btn-remove-disp').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idDisp = btn.getAttribute('data-id');
+                cancellaDisponibilita(idDisp);
+            });
+        });
+
+        // 2. Form per proporre la propria disponibilità
+        const formCard = document.createElement('div');
+        formCard.className = 'shift-card';
+        formCard.style.padding = '1.25rem';
+        formCard.innerHTML = `
+            <h3 style="margin-top:0; color:var(--text-main); font-size:1.1rem; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:0.5rem; margin-bottom:1rem;">Offri la tua disponibilità</h3>
+            <div style="display:flex; flex-direction:column; gap:0.8rem;">
+                <div>
+                    <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.3rem;">Ruolo</label>
+                    <select id="disp-ruolo" class="btn" style="width:100%; text-align:left; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.25); color:#fff; font-size:0.95rem;">
+                        <option value="autista">🚑 Autista MSB</option>
+                        <option value="referente_soreu">📞 Socc. Referente SOREU</option>
+                        <option value="soccorritore">🎒 Operatore DAE</option>
+                        <option value="allievo_quarto_posto">🔰 Allievo</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:1rem;">
+                    <div style="flex:1;">
+                        <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.3rem;">Dalle ore</label>
+                        <input type="time" id="disp-inizio" value="08:00" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.25); color:#fff; padding:0.5rem; border-radius:6px; font-size:0.95rem; font-family:inherit;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="display:block; font-size:0.8rem; color:var(--text-muted); margin-bottom:0.3rem;">Alle ore</label>
+                        <input type="time" id="disp-fine" value="14:00" style="width:100%; box-sizing:border-box; background:rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.25); color:#fff; padding:0.5rem; border-radius:6px; font-size:0.95rem; font-family:inherit;">
+                    </div>
+                </div>
+                <button id="btn-invia-disp" class="btn" style="margin-top:0.5rem; background:#00ffcc; color:#141419; font-weight:bold; border:none; box-shadow:0 0 10px rgba(0,255,204,0.3);">🙋 Invia Disponibilità</button>
             </div>
         `;
-        bsContent.appendChild(card);
-    });
+        bsContent.appendChild(formCard);
+        
+        // Event listener per pulsante invia
+        formCard.querySelector('#btn-invia-disp').addEventListener('click', () => {
+            const ruolo = document.getElementById('disp-ruolo').value;
+            const inizio = document.getElementById('disp-inizio').value;
+            const fine = document.getElementById('disp-fine').value;
+            aggiungiDisponibilita(dataString, ruolo, inizio, fine);
+        });
+    }
   };
 
   const renderSlotRow = (turno, keyRuolo, labelRuolo, assegnazioni, richiesto, icon) => {
@@ -918,6 +1089,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser = { matricola: 'kiosk', nome: 'Tabellone', cognome: 'Kiosk', is_kiosk: true };
             userInfoDiv.innerHTML = `<span style="color:var(--neon-orange);">🖥️ Modalità Tabellone (Sola Lettura)</span>`;
             startTurniSnapshot();
+            startDisponibilitaSnapshot();
             return;
         }
         if (matricola.toLowerCase() === 'agogio') {
@@ -977,6 +1149,7 @@ document.addEventListener('DOMContentLoaded', () => {
               document.getElementById('btn-goto-admin').addEventListener('click', () => { window.location.href = "vista_responsabile.html"; });
           }
           startTurniSnapshot();
+          startDisponibilitaSnapshot();
           if (typeof startVolunteerMessagingListener === 'function') {
               startVolunteerMessagingListener(currentUser.matricola);
           }
@@ -1014,6 +1187,21 @@ document.addEventListener('DOMContentLoaded', () => {
       activeUnsubscribeTurni = onSnapshot(q, (snapshot) => {
         turniList = snapshot.docs.map(doc => sanificaTurno({ id: doc.id, ...doc.data() }));
         console.log("[DEBUG_DB] onSnapshot ricevuto dal server. Aggiorno la vista graficamente.");
+        
+        renderMacroCalendar();
+        if (bottomSheet.classList.contains('active') && currentSelectedDate) {
+          renderMicroDay(currentSelectedDate);
+        }
+      });
+  }
+
+  function startDisponibilitaSnapshot() {
+      if (activeUnsubscribeDisponibilita) activeUnsubscribeDisponibilita();
+      const q = query(collection(db, "disponibilita")); 
+      
+      activeUnsubscribeDisponibilita = onSnapshot(q, (snapshot) => {
+        disponibilitaList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log("[DEBUG_DB] onSnapshot disponibilità ricevuto dal server. Aggiorno la vista.");
         
         renderMacroCalendar();
         if (bottomSheet.classList.contains('active') && currentSelectedDate) {
@@ -1095,5 +1283,64 @@ document.addEventListener('DOMContentLoaded', () => {
   if (closePanelBtn && msgPanel) {
       closePanelBtn.addEventListener("click", () => { msgPanel.style.display = "none"; });
   }
+
+  // =====================================================
+  //  GESTIONE SCRITTURA DISPONIBILITÀ (FIRESTORE)
+  // =====================================================
+  const aggiungiDisponibilita = async (dataString, ruolo, inizio, fine) => {
+      if (isUpdating) return;
+      
+      if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(inizio) || !/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(fine)) {
+          alert("Inserisci l'orario nel formato HH:MM (es. 08:00)");
+          return;
+      }
+      
+      const minI = timeToMinutes(inizio);
+      const minF = timeToMinutes(fine);
+      if (minF <= minI) {
+          alert("L'orario di fine deve essere successivo all'orario di inizio.");
+          return;
+      }
+
+      console.log(`[DEBUG_DB] Invio disponibilità per ${dataString} ruolo ${ruolo} orario ${inizio}-${fine}`);
+      isUpdating = true;
+      try {
+          const nuovaDisp = {
+              matricola: String(currentUser.matricola).trim(),
+              nominativo: String(`${currentUser.cognome} ${currentUser.nome}`).trim(),
+              data: String(dataString).trim(),
+              ruolo: String(ruolo).trim(),
+              orario: {
+                  inizio: String(inizio).trim(),
+                  fine: String(fine).trim()
+              },
+              stato: "IN_ATTESA",
+              creato_il: new Date().toISOString()
+          };
+          await addDoc(collection(db, "disponibilita"), nuovaDisp);
+          console.log("[DEBUG_DB] Disponibilità salvata con successo");
+      } catch (err) {
+          console.error("Errore salvataggio disponibilità:", err);
+          alert("Errore durante l'invio della disponibilità: " + err);
+      } finally {
+          isUpdating = false;
+      }
+  };
+
+  const cancellaDisponibilita = async (idDisp) => {
+      if (isUpdating) return;
+      if (!confirm("Vuoi davvero cancellare questa disponibilità?")) return;
+      
+      isUpdating = true;
+      try {
+          await deleteDoc(doc(db, "disponibilita", idDisp));
+          console.log("[DEBUG_DB] Disponibilità cancellata con successo");
+      } catch (err) {
+          console.error("Errore cancellazione disponibilità:", err);
+          alert("Errore durante la cancellazione: " + err);
+      } finally {
+          isUpdating = false;
+      }
+  };
 
 });

@@ -12,7 +12,7 @@ CONFIGURAZIONI DA ATTIVARE MANUALMENTE SULLA CONSOLE FIREBASE (BLOCCANTI PER IL 
 */
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { getFirestore, collection, getDocs, updateDoc, doc, onSnapshot, query, writeBatch, getDoc, runTransaction, setDoc, deleteDoc, arrayUnion } from "firebase/firestore";
+import { getFirestore, collection, getDocs, updateDoc, doc, onSnapshot, query, writeBatch, getDoc, runTransaction, setDoc, deleteDoc, arrayUnion, where } from "firebase/firestore";
 import { formattaNominativoUtente, ordinaUtentiAlfabetico, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo, calcolaBuchiRuolo } from './utils.js';
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -34,6 +34,7 @@ try {
 
 let modificheSospese = []; 
 let turniOriginali = new Map();
+let disponibilitaList = []; // Lista disponibilità volontari
 let currentAdminUser = null;
 let recentlyUpdatedRoles = new Set();
 let spostamentoAttivoGlobale = null;
@@ -498,6 +499,12 @@ document.addEventListener('DOMContentLoaded', () => {
           });
       });
 
+      if (activeUnsubscribes.disponibilita) activeUnsubscribes.disponibilita();
+      activeUnsubscribes.disponibilita = onSnapshot(collection(db, "disponibilita"), (snap) => {
+          disponibilitaList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          renderTable();
+      });
+
       const q = query(collection(db, "turni")); 
       
       if (activeUnsubscribes.turni) activeUnsubscribes.turni();
@@ -559,6 +566,9 @@ document.addEventListener('DOMContentLoaded', () => {
           const fineTurno = turno.orario?.fine || "00:00";
           
           const formatCell = (assegnazioni, richiesto, roleKey) => {
+              const dispPerRuolo = disponibilitaList.filter(d => d.data === turno.data && d.ruolo === roleKey && d.stato !== 'NON_SELEZIONATO');
+              const countDisp = dispPerRuolo.length;
+
               if (assegnazioni && assegnazioni.length > 0) {
                   let html = '';
                   assegnazioni.forEach((membro) => {
@@ -567,7 +577,6 @@ document.addEventListener('DOMContentLoaded', () => {
                       let badgeTag = '<span style="font-weight: bold; font-size: 0.8rem; color: #ffcc00;">[?]</span>';
                       if (window.globalUsersMap) {
                           const mStr = String(membro.matricola);
-                          // Try exact match first, then zero-padded/stripped variants
                           const userObj = window.globalUsersMap[mStr]
                               || window.globalUsersMap[parseInt(mStr, 10)]
                               || window.globalUsersMap[mStr.replace(/^0+/, '')]
@@ -592,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                       const statusHtml = membro.convalidato_da_admin 
                           ? `<span style="font-size:0.6rem; color:var(--neon-green);">✓ Conv.</span>`
-                          : `<span style="font-size:0.6rem; color:#38bdf8;">⚠ Attesa</span>`;
+                          : `<span style="font-size:0.6rem; color:#38bdf8;">⚠️ Attesa</span>`;
                           
                       html += `<div style="margin-bottom: 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.2rem;">
                           <span style="color:${nameColor}; font-weight:bold;">${nomeDisplay} ${badgeTag}</span>${btnEditTimeHtml}${btnRemoveHtml}${btnSposHtml}<br>
@@ -607,6 +616,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             ⚠️ Scoperto: ${b.inizio}-${b.fine}
                           </div>`;
                       });
+                      if (countDisp > 0) {
+                          html += `<div style="margin-top: 0.35rem; text-align: center;"><span class="status-badge" style="background: rgba(0, 255, 204, 0.15); color: #00ffcc; border: 1px solid rgba(0, 255, 204, 0.3); font-weight: bold; font-size: 0.75rem; cursor: pointer; padding: 2px 6px;" onclick="window.openInsertModal(turniOriginali.get('${turno.id}'))">🙋 Candidati: ${countDisp}</span></div>`;
+                      }
                   }
 
                   return html;
@@ -616,7 +628,10 @@ document.addEventListener('DOMContentLoaded', () => {
               const isAdmin = currentAdminUser?.ruolo === 'admin' || currentAdminUser?.ruolo === 'superadmin' || currentAdminUser?.is_admin === true || currentAdminUser?.superadmin === true;
               const btnDestHtml = isAdmin && spostamentoAttivoGlobale ? `<br><button class="admin-destina-vol btn" data-turno="${turno.id}" data-ruolo="${roleKey}" title="Destina Qui" style="padding: 0.2rem 0.4rem; font-size: 0.7rem; border-color:var(--neon-green); color:var(--neon-green); margin-top: 0.2rem; background: rgba(0,255,0,0.1);">Destina qui</button>` : '';
               
-              return `<em style="color:var(--neon-red); font-size: 0.85rem;">Vuoto</em>${btnDestHtml}`;
+              const dispBadge = countDisp > 0 
+                  ? `<br><span class="status-badge" style="background: rgba(0, 255, 204, 0.15); color: #00ffcc; border: 1px solid rgba(0, 255, 204, 0.3); font-weight: bold; font-size: 0.75rem; cursor: pointer; display: inline-block; margin-top: 0.25rem; padding: 2px 6px;" onclick="window.openInsertModal(turniOriginali.get('${turno.id}'))">🙋 Candidati: ${countDisp}</span>`
+                  : '';
+              return `<em style="color:var(--neon-red); font-size: 0.85rem;">Vuoto</em>${dispBadge}${btnDestHtml}`;
           };
 
           const autistaFull = !req.autista_richiesto || calcolaCoperturaRuolo(eq.autista, inizioTurno, fineTurno).isFull;
@@ -1008,6 +1023,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Notifiche di convalida (fuori dalla transazione, sono create nuove)
                 if (mod.payloadModifica.nuovoStato === 'CONVALIDATO') {
+                    // Svuotamento disponibilità in eccesso per la data di questo turno
+                    try {
+                        const qDisp = query(collection(db, "disponibilita"), where("data", "==", mod.turnoVecchio.data));
+                        const snapDisp = await getDocs(qDisp);
+                        if (snapDisp.docs.length > 0) {
+                            const batchDisp = writeBatch(db);
+                            snapDisp.docs.forEach(docDisp => {
+                                batchDisp.delete(docDisp.ref);
+                            });
+                            await batchDisp.commit();
+                            console.log(`[DEBUG_DB] Pulite ${snapDisp.docs.length} disponibilità in eccesso per la data ${mod.turnoVecchio.data}`);
+                        }
+                    } catch (errDisp) {
+                        console.error("Errore durante lo svuotamento delle disponibilità:", errDisp);
+                    }
+
                     const newEq = mod.payloadModifica.nuovoEquipaggio || {};
                     const notifBatch = writeBatch(db);
                     ['autista', 'referente_soreu', 'soccorritore', 'allievo_quarto_posto'].forEach(ruoloKey => {
@@ -1252,6 +1283,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- LOGICA MODALE INSERIMENTO ---
   let modalTurnoId = null;
+  let modalTurnoDate = null;
   let allVolunteersCache = null;
 
   const modalOverlay = document.getElementById('modal-inserimento');
@@ -1264,6 +1296,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.openInsertModal = function(turnoObj) {
     if(!modalOverlay) return;
     modalTurnoId = turnoObj.id;
+    modalTurnoDate = turnoObj.data;
     const targetDate = `${turnoObj.data} ${turnoObj.orario?.inizio||''}`;
     
     modalRoleSelect.innerHTML = '';
@@ -1430,8 +1463,22 @@ document.addEventListener('DOMContentLoaded', () => {
       return true;
     });
 
-    // Ordinamento alfabetico crescente (A-Z) per Cognome Nome
+    // Trova le matricole disponibili per questa data e ruolo
+    const matricoleDisponibili = new Map(); // matricola -> orario
+    disponibilitaList.forEach(d => {
+        if (d.data === modalTurnoDate && d.ruolo === targetField && d.stato !== 'NON_SELEZIONATO') {
+            matricoleDisponibili.set(String(d.matricola).trim(), d.orario);
+        }
+    });
+
+    // Ordinamento: prima chi è disponibile, poi ordine alfabetico crescente (A-Z) per Cognome Nome
     filtered.sort((a, b) => {
+      const isDispA = matricoleDisponibili.has(String(a.matricola).trim());
+      const isDispB = matricoleDisponibili.has(String(b.matricola).trim());
+      
+      if (isDispA && !isDispB) return -1;
+      if (!isDispA && isDispB) return 1;
+      
       const nameA = `${a.cognome || ''} ${a.nome || ''}`.trim().toLowerCase();
       const nameB = `${b.cognome || ''} ${b.nome || ''}`.trim().toLowerCase();
       return nameA.localeCompare(nameB);
@@ -1440,11 +1487,25 @@ document.addEventListener('DOMContentLoaded', () => {
     modalVolunteersList.innerHTML = '';
     
     filtered.forEach(u => {
+      const uMatricola = String(u.matricola).trim();
+      const isDisponibile = matricoleDisponibili.has(uMatricola);
+      const orarioInfo = isDisponibile ? matricoleDisponibili.get(uMatricola) : null;
+      
       const div = document.createElement('div');
       div.className = 'volunteer-item';
+      
+      if (isDisponibile) {
+          div.style.borderLeft = '4px solid #00ffcc';
+          div.style.background = 'rgba(0, 255, 204, 0.05)';
+      }
+      
+      const badgeDisp = isDisponibile 
+          ? `<span class="badge" style="background:rgba(0,255,204,0.2); color:#00ffcc; font-size:0.7rem; font-weight:bold; margin-left:0.5rem; padding: 2px 6px;">DISPONIBILE (${orarioInfo.inizio}-${orarioInfo.fine})</span>` 
+          : '';
+          
       div.innerHTML = `
         <div>
-          <strong>${u.nome || ''} ${u.cognome || ''}</strong><br>
+          <strong>${u.nome || ''} ${u.cognome || ''}</strong> ${badgeDisp}<br>
           <small>Matricola: ${u.matricola || 'N/A'}</small>
         </div>
         <button class="btn">Seleziona</button>

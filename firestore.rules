@@ -39,6 +39,15 @@ service cloud.firestore {
     }
 
     // =====================================================
+    //  DISPONIBILITA — Lettura e scrittura per tutti gli autenticati
+    // =====================================================
+    match /disponibilita/{dispId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // =====================================================
     //  UTENTI — Ogni utente può leggere tutti i profili.
     //  Ogni utente può scrivere SOLO il proprio profilo,
     //  ma NON può auto-modificare i campi di privilegio.

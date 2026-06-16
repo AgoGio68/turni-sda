@@ -239,20 +239,34 @@
     <div class="app-layout">
       <!-- SIDEBAR FILTRI -->
       <aside class="sidebar-filters" id="sidebar">
-        <h3>🎛️ Visualizzazione</h3>
-        <div class="filter-btn-group">
-          <button class="filter-btn active" data-filter="focus" id="filter-focus">
-            <span class="filter-icon">👤</span>
-            <span class="filter-label">Focus Personale<small>Tutti i turni, dettaglio al click</small></span>
+        <h3>📅 Tipo Calendario</h3>
+        <div class="filter-btn-group" style="margin-bottom: 1.5rem;">
+          <button class="filter-btn active" id="btn-view-ufficiale">
+            <span class="filter-icon">📅</span>
+            <span class="filter-label">Turni Ufficiali<small>Visualizza e prenota i turni</small></span>
           </button>
-          <button class="filter-btn" data-filter="miei" id="filter-miei">
-            <span class="filter-icon">⭐</span>
-            <span class="filter-label">Solo i Miei<small>Mostra solo i turni dove sei iscritto</small></span>
+          <button class="filter-btn" id="btn-view-disponibilita">
+            <span class="filter-icon">🙋</span>
+            <span class="filter-label">Dai Disponibilità<small>Proponi le tue date/ruoli</small></span>
           </button>
-          <button class="filter-btn" data-filter="tabellone" id="filter-tabellone">
-            <span class="filter-icon">📋</span>
-            <span class="filter-label">Tabellone Generale<small>Tutti i turni con equipaggi</small></span>
-          </button>
+        </div>
+
+        <div id="container-filtri-ufficiali">
+          <h3>🎛️ Filtri Turni</h3>
+          <div class="filter-btn-group">
+            <button class="filter-btn active" data-filter="focus" id="filter-focus">
+              <span class="filter-icon">👤</span>
+              <span class="filter-label">Focus Personale<small>Tutti i turni, dettaglio al click</small></span>
+            </button>
+            <button class="filter-btn" data-filter="miei" id="filter-miei">
+              <span class="filter-icon">⭐</span>
+              <span class="filter-label">Solo i Miei<small>Mostra solo i turni dove sei iscritto</small></span>
+            </button>
+            <button class="filter-btn" data-filter="tabellone" id="filter-tabellone">
+              <span class="filter-icon">📋</span>
+              <span class="filter-label">Tabellone Generale<small>Tutti i turni con equipaggi</small></span>
+            </button>
+          </div>
         </div>
         <hr class="sidebar-separator">
         <button class="btn-fullscreen" id="btn-tv-mode">
