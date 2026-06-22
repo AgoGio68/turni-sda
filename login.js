@@ -124,18 +124,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 2. Costruzione e-mail
     const email = matricola.toLowerCase() === 'agogio' ? 'agogio@turni-sda.local' : `${matricola}@turni-sda.local`;
 
-    // Intercettazione A MONTE dell'autenticazione per l'account speciale AgoGio
-    if (matricola.toLowerCase() === 'agogio') {
-       if (password === '950477') {
-         localStorage.setItem('superadmin_override', 'true');
-         window.location.href = "vista_responsabile.html";
-       } else {
-         errorMsg.textContent = "Credenziali Superadmin non valide.";
-         btnLogin.disabled = false;
-       }
-       return;
-    }
-
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
@@ -180,20 +168,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function checkRoleAndRedirect(user) {
     const matricola = user.email.split('@')[0];
+    const noRedirect = new URLSearchParams(window.location.search).get('no_redirect') === 'true';
     
-    // Se è loggato in altro modo, o se AgoGio non ha usato il token (caso anomalo ma gestito)
     if (matricola.toLowerCase() === 'agogio') {
       localStorage.setItem('superadmin_override', 'true');
-      window.location.href = "vista_responsabile.html";
+      if (noRedirect) {
+        window.location.href = "vista_volontario.html?no_redirect=true";
+      } else {
+        window.location.href = "vista_responsabile.html";
+      }
       return;
     }
 
     try {
       const docSnap = await getDoc(doc(db, "utenti", matricola));
       if (docSnap.exists()) {
-        // Come stabilito: TUTTI accedono alla vista volontario.
-        // Gli admin troveranno lì il pulsante "Accedi a Programmazione"
-        window.location.href = "vista_volontario.html";
+        if (noRedirect) {
+          window.location.href = "vista_volontario.html?no_redirect=true";
+        } else {
+          window.location.href = "vista_volontario.html";
+        }
       } else {
         errorMsg.textContent = "Utente non trovato nel database.";
       }

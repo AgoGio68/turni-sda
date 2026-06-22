@@ -13,7 +13,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { getFirestore, collection, query, onSnapshot, doc, getDoc, getDocs, runTransaction, addDoc, deleteDoc } from "firebase/firestore";
 import { verificaIscrizione, validaRiposi } from './regole_iscrizione.js';
-import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo, calcolaBuchiRuolo } from './utils.js';
+import { formattaNominativoUtente, formattaNomeDisplay, sanificaTurno, calcolaCoperturaRuolo, calcolaBuchiRuolo, timeToMinutes } from './utils.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAc_ZXW_6QXvG9yHRMxB3dbZEp9X8qTTzg",
@@ -716,9 +716,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Event listener per pulsante invia
         formCard.querySelector('#btn-invia-disp').addEventListener('click', () => {
-            const ruolo = document.getElementById('disp-ruolo').value;
-            const inizio = document.getElementById('disp-inizio').value;
-            const fine = document.getElementById('disp-fine').value;
+            const ruolo = formCard.querySelector('#disp-ruolo').value;
+            const inizio = formCard.querySelector('#disp-inizio').value;
+            const fine = formCard.querySelector('#disp-fine').value;
             aggiungiDisponibilita(dataString, ruolo, inizio, fine);
         });
     }
@@ -1092,8 +1092,22 @@ document.addEventListener('DOMContentLoaded', () => {
             startDisponibilitaSnapshot();
             return;
         }
+        const noRedirect = new URLSearchParams(window.location.search).get('no_redirect') === 'true';
         if (matricola.toLowerCase() === 'agogio') {
-           window.location.href = "vista_responsabile.html";
+           if (!noRedirect) {
+               window.location.href = "vista_responsabile.html";
+               return;
+           }
+           // Profilo virtuale superadmin per evitare redirect in modalità split-screen
+           currentUser = { matricola: '034', nome: 'Giorgio', cognome: 'Agostini', is_admin: true, superadmin: true };
+           let adminBtnHTML = `<button id="btn-goto-admin" class="btn" style="margin-left:1rem; padding:0.3rem 0.6rem; font-size:0.8rem; border-color:var(--neon-green); color:var(--neon-green); background:rgba(57,255,20,0.1);">Accedi a Programmazione</button>`;
+           let notifyBtnHTML = "";
+           userInfoDiv.innerHTML = `Profilo: SUPERADMIN ${adminBtnHTML} ${notifyBtnHTML} <a href="#" id="logout-btn" style="margin-left:1rem; color:var(--neon-orange); font-size:0.8rem;">Esci</a>`;
+           document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+           document.getElementById('btn-goto-admin').addEventListener('click', () => { window.location.href = "vista_responsabile.html"; });
+           
+           startTurniSnapshot();
+           startDisponibilitaSnapshot();
            return;
         }
         
@@ -1173,7 +1187,8 @@ document.addEventListener('DOMContentLoaded', () => {
           signOut(auth);
         }
       } else {
-        window.location.href = "index.html";
+        const noRedirect = new URLSearchParams(window.location.search).get('no_redirect') === 'true';
+        window.location.href = "index.html" + (noRedirect ? "?no_redirect=true" : "");
       }
     } catch (e) {
       console.error("Errore onAuthStateChanged:", e);

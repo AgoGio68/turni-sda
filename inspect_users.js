@@ -7,8 +7,11 @@ initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 
 async function run() {
-    const snap = await db.collection("utenti").limit(3).get();
-    snap.docs.forEach(d => console.log(d.id, d.data()));
+    console.log("Fetching availability...");
+    const snap = await db.collection("disponibilita").get();
+    snap.docs.forEach(d => {
+        console.log("Availability:", d.id, d.data());
+    });
     process.exit(0);
 }
 run();
