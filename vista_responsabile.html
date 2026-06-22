@@ -20,6 +20,154 @@
     }
   }
   </script>
+
+  <style>
+    /* ============================================================ */
+    /*  ADMIN TABLE — CARD LAYOUT su Mobile                         */
+    /*  Applicato SOLO a vista_responsabile.html                    */
+    /* ============================================================ */
+    @media (max-width: 768px) {
+
+      /* Nascondi l'intestazione: le etichette vengono dai data-label */
+      #admin-table thead {
+        display: none;
+      }
+
+      /* Tabella, corpo e righe → display block */
+      #admin-table,
+      #admin-table tbody,
+      #admin-table tr {
+        display: block;
+        width: 100%;
+      }
+
+      /* Ogni riga diventa una card glassmorphic */
+      #admin-table tr {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        margin-bottom: 1rem;
+        padding: 0.75rem 1rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        transition: border-color 0.2s;
+      }
+      #admin-table tr:hover {
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+      /* Righe in bozza: bordo arancione */
+      #admin-table tr.staged-row {
+        border-color: var(--neon-orange) !important;
+      }
+
+      /* Le prime 3 celle (Squadra + Data + Stato) diventano una testata inline della card */
+      #admin-table tr td[data-label="Squadra"],
+      #admin-table tr td[data-label="Data / Orario"],
+      #admin-table tr td[data-label="Stato"] {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.25rem 0;
+        border: none;
+      }
+      /* Separatore dopo la testata */
+      #admin-table tr td[data-label="Stato"] {
+        display: flex;
+        justify-content: flex-end;
+        flex: 1;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+        padding-bottom: 0.6rem;
+        margin-bottom: 0.5rem;
+      }
+
+      /* Wrapper per le prime 3 celle in riga */
+      #admin-table tr {
+        display: flex;
+        flex-direction: column;
+      }
+      /* Header row sintetica (Squadra + Data + Stato) */
+      #admin-table tr td[data-label="Squadra"] {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--primary-neon);
+        padding-bottom: 0;
+      }
+      #admin-table tr td[data-label="Data / Orario"] {
+        flex: 1;
+        padding: 0.15rem 0;
+      }
+
+      /* Celle ruolo: riga con etichetta a sinistra e valore a destra */
+      #admin-table tr td[data-label] {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.4rem 0;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+        font-size: 0.88rem;
+        text-align: left;
+      }
+      #admin-table tr td[data-label]:last-child {
+        border-bottom: none;
+      }
+
+      /* Pseudo-etichetta dal data-label */
+      #admin-table tr td[data-label]::before {
+        content: attr(data-label);
+        flex-shrink: 0;
+        min-width: 90px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: var(--text-muted);
+        padding-top: 2px;
+      }
+
+      /* Celle ruolo: niente etichetta ridondante per Squadra/Data/Stato che già si vedono */
+      #admin-table tr td[data-label="Squadra"]::before,
+      #admin-table tr td[data-label="Data / Orario"]::before,
+      #admin-table tr td[data-label="Stato"]::before {
+        display: none;
+      }
+
+      /* Cella Azioni: bottoni full-width e più grandi */
+      #admin-table tr td[data-label="Azioni"] {
+        display: flex !important;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: flex-start;
+        border-top: 1px dashed rgba(255, 255, 255, 0.08);
+        margin-top: 0.4rem;
+        padding-top: 0.6rem;
+      }
+      #admin-table tr td[data-label="Azioni"]::before {
+        display: none;
+      }
+      #admin-table tr td[data-label="Azioni"] .btn {
+        flex: 1;
+        min-width: 80px;
+        padding: 0.55rem 0.5rem !important;
+        font-size: 0.78rem !important;
+        text-align: center;
+      }
+
+      /* Header compatto admin */
+      header h1 {
+        font-size: 1rem;
+      }
+      #admin-info {
+        font-size: 0.75rem;
+      }
+      #active-admins {
+        display: none;
+      }
+
+      /* Pannello messaggi full-width su mobile */
+      #messaging-panel {
+        width: 100vw !important;
+      }
+    }
+  </style>
 </head>
 <body>
   <header>

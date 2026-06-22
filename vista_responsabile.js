@@ -705,14 +705,15 @@ document.addEventListener('DOMContentLoaded', () => {
               { key: 'soccorritore', reqVal: req.soccorritore_richiesto },
               { key: 'allievo_quarto_posto', reqVal: req.allievo_consentito }
           ];
-          const celleRuoliHtml = ruoliOrdinati.map(r => `<td>${formatCell(eq[r.key], r.reqVal, r.key)}</td>`).join('');
+          const labelMap = { autista: 'Autista', referente_soreu: 'Rif. SOREU', soccorritore: 'Op. DAE', allievo_quarto_posto: 'Allievo' };
+          const celleRuoliHtml = ruoliOrdinati.map(r => `<td data-label="${labelMap[r.key]}">${formatCell(eq[r.key], r.reqVal, r.key)}</td>`).join('');
 
           tr.innerHTML = `
-            <td>${squadraHtml}</td>
-            <td><strong style="color: var(--text-main); font-size: 1.1rem;">${fDate}</strong><br><span style="font-size:0.85rem; color:var(--text-muted)">${turno.orario?.inizio || ''}-${turno.orario?.fine || ''}</span></td>
-            <td><span class="badge ${badgeClass}" style="font-size: 0.65rem;">${stato}</span></td>
+            <td data-label="Squadra">${squadraHtml}</td>
+            <td data-label="Data / Orario"><strong style="color: var(--text-main); font-size: 1.1rem;">${fDate}</strong><br><span style="font-size:0.85rem; color:var(--text-muted)">${turno.orario?.inizio || ''}-${turno.orario?.fine || ''}</span></td>
+            <td data-label="Stato"><span class="badge ${badgeClass}" style="font-size: 0.65rem;">${stato}</span></td>
             ${celleRuoliHtml}
-            <td style="display:flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; justify-content: center; min-width: 110px;">
+            <td data-label="Azioni" style="display:flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; justify-content: center; min-width: 110px;">
               <button class="btn action-btn insert" data-id="${turno.id}" style="padding: 0.3rem 0.4rem; font-size: 0.7rem; border-color:var(--neon-green)">➕ Ins.</button>
               <button class="btn action-btn validate" data-id="${turno.id}" style="padding: 0.3rem 0.4rem; font-size: 0.7rem; border-color:#38bdf8; color:#38bdf8">✓ Conv.</button>
             </td>
