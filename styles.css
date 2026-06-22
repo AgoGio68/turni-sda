@@ -310,8 +310,9 @@ input:checked + .slider:before { transform: translateX(24px); }
   display: none; /* visibile solo su mobile via media query */
   position: fixed;
   bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   width: calc(100% - 2rem);
   max-width: 420px;
   height: var(--bottom-nav-height);
