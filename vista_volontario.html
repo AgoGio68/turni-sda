@@ -225,7 +225,7 @@
   </header>
 
   <!-- Volunteer Message Panel (Read-Only) -->
-  <div id="volunteer-messaging-panel" style="display: none; position: fixed; top: 0; right: 0; width: 350px; height: 100vh; background: rgba(20, 20, 25, 0.9); backdrop-filter: blur(12px); box-shadow: -5px 0 25px rgba(0,0,0,0.5); z-index: 9999; padding: 20px; box-sizing: border-box; font-family: sans-serif; color: #fff; border-left: 1px solid rgba(255,255,255,0.15);">
+  <div id="volunteer-messaging-panel" style="display: none; position: fixed; top: 0; right: 0; width: min(350px, 100vw); height: 100vh; background: rgba(20, 20, 25, 0.9); backdrop-filter: blur(12px); box-shadow: -5px 0 25px rgba(0,0,0,0.5); z-index: 9999; padding: 20px; box-sizing: border-box; font-family: sans-serif; color: #fff; border-left: 1px solid rgba(255,255,255,0.15);">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 15px;">
           <h3 style="margin: 0; color: #00ffcc; font-size: 18px;">Le Tue Comunicazioni</h3>
           <button id="close-vol-messaging-panel" style="background: transparent; border: none; color: #aaa; font-size: 20px; cursor: pointer;">&times;</button>
@@ -333,7 +333,36 @@
     </div>
   </div>
 
-  <script type="module" src="vista_volontario.js?v=1.8.38"></script>
-  <script type="module" src="messaging_service.js?v=1.8.38"></script>
+
+  <!-- ============================================================ -->
+  <!-- BOTTOM NAVIGATION BAR — visibile solo su mobile (≤768px)     -->
+  <!-- ============================================================ -->
+  <nav class="bottom-nav" id="bottom-nav" aria-label="Navigazione principale">
+    <div class="bottom-nav-inner">
+      <button class="bottom-nav-tab active" data-nav="ufficiale" aria-label="Turni Ufficiali">
+        <span class="nav-icon">📅</span>
+        <span>Turni</span>
+      </button>
+      <button class="bottom-nav-tab" data-nav="disponibilita" aria-label="Dai Disponibilità">
+        <span class="nav-icon">🙋</span>
+        <span>Disponibilità</span>
+      </button>
+      <button class="bottom-nav-tab" data-nav="focus" aria-label="Focus Personale">
+        <span class="nav-icon">👤</span>
+        <span>Focus</span>
+      </button>
+      <button class="bottom-nav-tab" data-nav="miei" aria-label="Solo i Miei Turni">
+        <span class="nav-icon">⭐</span>
+        <span>I Miei</span>
+      </button>
+      <button class="bottom-nav-tab" data-nav="tabellone" aria-label="Tabellone Generale">
+        <span class="nav-icon">📋</span>
+        <span>Tabellone</span>
+      </button>
+    </div>
+  </nav>
+
+  <script type="module" src="vista_volontario.js?v=1.8.41"></script>
+  <script type="module" src="messaging_service.js?v=1.8.41"></script>
 </body>
 </html>

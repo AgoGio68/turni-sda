@@ -9,6 +9,7 @@
   --neon-red: #ff073a; 
   --neon-orange: #ff9900;
   --radius: 12px;
+  --bottom-nav-height: 64px;
 }
 
 body {
@@ -301,3 +302,181 @@ h2 { color: var(--text-main); margin-top: 0; }
 .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
 input:checked + .slider { background-color: #00f2fe; box-shadow: 0 0 10px #00f2fe; }
 input:checked + .slider:before { transform: translateX(24px); }
+
+/* ============================================================ */
+/*  BOTTOM NAVIGATION BAR (mobile only)                         */
+/* ============================================================ */
+.bottom-nav {
+  display: none; /* visibile solo su mobile via media query */
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: var(--bottom-nav-height);
+  background: rgba(11, 15, 25, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-glass);
+  z-index: 1500;
+  padding: 0 0.5rem;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+}
+
+.bottom-nav-inner {
+  display: flex;
+  height: 100%;
+  align-items: stretch;
+}
+
+.bottom-nav-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  transition: all 0.25s ease;
+  padding: 0.25rem 0;
+  min-height: 44px; /* Apple tap target minimum */
+  border-radius: 12px;
+  margin: 8px 3px;
+  position: relative;
+}
+
+.bottom-nav-tab .nav-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.bottom-nav-tab:hover .nav-icon {
+  transform: translateY(-2px);
+}
+
+.bottom-nav-tab.active {
+  color: var(--text-main);
+  background: rgba(59,130,246,0.12);
+}
+
+.bottom-nav-tab.active .nav-icon {
+  filter: drop-shadow(0 0 6px var(--primary-neon));
+  transform: translateY(-2px) scale(1.1);
+}
+
+/* Indicatore attivo sotto l'icona */
+.bottom-nav-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--primary-neon);
+  box-shadow: 0 0 6px var(--primary-neon);
+}
+
+/* Variante per "Disponibilità" */
+.bottom-nav-tab[data-nav="disponibilita"].active {
+  background: rgba(57,255,20,0.08);
+}
+.bottom-nav-tab[data-nav="disponibilita"].active::after {
+  background: var(--neon-green);
+  box-shadow: 0 0 6px var(--neon-green);
+}
+.bottom-nav-tab[data-nav="disponibilita"].active .nav-icon {
+  filter: drop-shadow(0 0 6px var(--neon-green));
+}
+
+/* Variante per "Tabellone" */
+.bottom-nav-tab[data-nav="tabellone"].active {
+  background: rgba(255,153,0,0.08);
+}
+.bottom-nav-tab[data-nav="tabellone"].active::after {
+  background: var(--neon-orange);
+  box-shadow: 0 0 6px var(--neon-orange);
+}
+.bottom-nav-tab[data-nav="tabellone"].active .nav-icon {
+  filter: drop-shadow(0 0 6px var(--neon-orange));
+}
+
+/* ============================================================ */
+/*  RESPONSIVE MOBILE                                           */
+/* ============================================================ */
+@media (max-width: 768px) {
+
+  /* Header compatto */
+  header {
+    padding: 0.6rem 1rem;
+  }
+  h1 {
+    font-size: 1.1rem;
+  }
+
+  /* Container senza margine eccessivo */
+  .container {
+    margin: 1rem auto;
+    padding: 0 0.75rem;
+    /* Lascia spazio per la bottom nav bar */
+    padding-bottom: calc(var(--bottom-nav-height) + 1rem);
+  }
+
+  /* Glass panel meno padding */
+  .glass-panel {
+    padding: 1rem;
+  }
+
+  /* Calendario: 3 colonne su tutti i telefoni */
+  .calendar-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.6rem;
+  }
+
+  /* Day card più compatta ma tap-friendly */
+  .day-card {
+    padding: 0.75rem 0.5rem;
+    min-height: 80px;
+    gap: 0.3rem;
+  }
+
+  /* Bottom nav visibile su mobile */
+  .bottom-nav {
+    display: flex;
+  }
+
+  /* Sidebar nascosta su mobile — gestita dalla bottom nav */
+  .sidebar-filters {
+    display: none !important;
+  }
+
+  /* Layout colonna senza sidebar */
+  .app-layout {
+    flex-direction: column;
+  }
+
+  /* Pannello messaggi full-width su mobile */
+  #volunteer-messaging-panel,
+  #messaging-panel {
+    width: min(350px, 100vw) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Su telefoni piccoli la griglia è ancora più compatta */
+  .calendar-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+  }
+
+  .day-card {
+    padding: 0.6rem 0.4rem;
+    min-height: 72px;
+  }
+}

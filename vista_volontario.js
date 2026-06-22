@@ -349,6 +349,67 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnCloseDetails) btnCloseDetails.addEventListener('click', closeBottomSheet);
 
   // =====================================================
+  //  SWIPE-TO-CLOSE BOTTOM SHEET (Proposta F)
+  // =====================================================
+  let touchStartY = 0;
+  bottomSheet.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+  bottomSheet.addEventListener('touchend', (e) => {
+      const deltaY = e.changedTouches[0].clientY - touchStartY;
+      if (deltaY > 60) {
+          closeBottomSheet();
+      }
+  }, { passive: true });
+
+  // =====================================================
+  //  BOTTOM NAVIGATION BAR (Proposta A — mobile only)
+  // =====================================================
+  const bottomNavTabs = document.querySelectorAll('.bottom-nav-tab');
+
+  const setActiveNavTab = (navKey) => {
+      bottomNavTabs.forEach(t => t.classList.toggle('active', t.dataset.nav === navKey));
+  };
+
+  bottomNavTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+          const nav = tab.dataset.nav;
+
+          if (nav === 'ufficiale' || nav === 'disponibilita') {
+              // Cambia la Vista (ufficiale / disponibilita)
+              if (nav === 'ufficiale') {
+                  if (btnViewUfficiale) btnViewUfficiale.click();
+              } else {
+                  if (btnViewDisponibilita) btnViewDisponibilita.click();
+              }
+              setActiveNavTab(nav);
+          } else {
+              // Cambia il Filtro (focus / miei / tabellone) — rimane nella vista ufficiale
+              if (currentView !== 'ufficiale') {
+                  if (btnViewUfficiale) btnViewUfficiale.click();
+              }
+              const targetBtn = document.getElementById(`filter-${nav}`);
+              if (targetBtn) targetBtn.click();
+              setActiveNavTab(nav);
+          }
+      });
+  });
+
+  // Sincronizza la bottom nav con i click sulla sidebar (desktop → mobile coerenza)
+  filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+          const f = btn.getAttribute('data-filter');
+          if (f) setActiveNavTab(f);
+      });
+  });
+  if (btnViewUfficiale) {
+      btnViewUfficiale.addEventListener('click', () => setActiveNavTab('ufficiale'));
+  }
+  if (btnViewDisponibilita) {
+      btnViewDisponibilita.addEventListener('click', () => setActiveNavTab('disponibilita'));
+  }
+
+  // =====================================================
   //  METODI DI RENDERING E LOGICA COMPONENTI
   // =====================================================
   const getUserRoleInShift = (turno) => {
