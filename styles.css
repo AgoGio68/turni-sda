@@ -309,15 +309,23 @@ input:checked + .slider:before { transform: translateX(24px); }
 .bottom-nav {
   display: none; /* visibile solo su mobile via media query */
   position: fixed;
-  bottom: 0; left: 0; right: 0;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 2rem);
+  max-width: 420px;
   height: var(--bottom-nav-height);
-  background: rgba(11, 15, 25, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid var(--border-glass);
+  background: rgba(11, 15, 25, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
   z-index: 1500;
   padding: 0 0.5rem;
-  box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+  box-shadow:
+    0 8px 32px rgba(0,0,0,0.6),
+    0 2px 8px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 .bottom-nav-inner {
@@ -420,12 +428,11 @@ input:checked + .slider:before { transform: translateX(24px); }
     font-size: 1.1rem;
   }
 
-  /* Container senza margine eccessivo */
+  /* Container lascia spazio per la bottom nav flottante */
   .container {
     margin: 1rem auto;
     padding: 0 0.75rem;
-    /* Lascia spazio per la bottom nav bar */
-    padding-bottom: calc(var(--bottom-nav-height) + 1rem);
+    padding-bottom: calc(var(--bottom-nav-height) + 2.5rem);
   }
 
   /* Glass panel meno padding */
