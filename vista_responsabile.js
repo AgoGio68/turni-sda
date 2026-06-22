@@ -1503,15 +1503,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Trova le matricole disponibili per questa data e QUALSIASI ruolo, registrando se è il ruolo cercato o un altro
     const matricoleDisponibili = new Map(); // matricola -> { id, ruolo, orario, isTargetRole }
+    const tObj = turniOriginali.get(modalTurnoId);
+    const inizioTurno = tObj?.orario?.inizio || "00:00";
+    const fineTurno = tObj?.orario?.fine || "00:00";
+
     disponibilitaList.forEach(d => {
         if (d.data === modalTurnoDate && d.stato !== 'NON_SELEZIONATO') {
             if (!d.orario || !d.orario.inizio || !d.orario.fine) return;
+
+            const isTargetRole = (d.ruolo === targetField);
+
             let overlaps = false;
-            const tObj = turniOriginali.get(modalTurnoId);
-            if (tObj) {
-                const inizioTurno = tObj.orario?.inizio || "00:00";
-                const fineTurno = tObj.orario?.fine || "00:00";
-                const assegnazioni = tObj.equipaggio_attuale?.[targetField];
+            if (isTargetRole) {
+                // Per il ruolo target, calcola l'overlap considerando i buchi esistenti
+                const assegnazioni = tObj?.equipaggio_attuale?.[targetField];
                 let assArray = [];
                 if (assegnazioni) {
                     assArray = Array.isArray(assegnazioni) ? assegnazioni : Object.values(assegnazioni);
@@ -1525,30 +1530,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     overlaps = checkTimeOverlap(inizioTurno, fineTurno, d.orario.inizio, d.orario.fine);
                 }
             } else {
-                overlaps = true; // Fallback
+                // Per un ruolo diverso da quello target: basta che copra almeno parte dell'orario del turno
+                overlaps = tObj
+                    ? checkTimeOverlap(inizioTurno, fineTurno, d.orario.inizio, d.orario.fine)
+                    : true;
             }
+
             if (overlaps) {
                 const key = String(d.matricola).trim();
-                const isTargetRole = (d.ruolo === targetField);
-                
                 // Se c'è già una disponibilità registrata per questa matricola, diamo la priorità a quella del ruolo corretto
                 if (matricoleDisponibili.has(key)) {
                     const existing = matricoleDisponibili.get(key);
                     if (!existing.isTargetRole && isTargetRole) {
-                        matricoleDisponibili.set(key, {
-                            id: d.id,
-                            ruolo: d.ruolo,
-                            orario: d.orario,
-                            isTargetRole: true
-                        });
+                        matricoleDisponibili.set(key, { id: d.id, ruolo: d.ruolo, orario: d.orario, isTargetRole: true });
                     }
                 } else {
-                    matricoleDisponibili.set(key, {
-                        id: d.id,
-                        ruolo: d.ruolo,
-                        orario: d.orario,
-                        isTargetRole: isTargetRole
-                    });
+                    matricoleDisponibili.set(key, { id: d.id, ruolo: d.ruolo, orario: d.orario, isTargetRole: isTargetRole });
                 }
             }
         }
@@ -1604,14 +1601,19 @@ document.addEventListener('DOMContentLoaded', () => {
           }
       }
           
+      // Serializziamo dispInfo come data-attribute JSON per passarlo al click handler in modo sicuro
+      const dispInfoAttr = dispInfo ? encodeURIComponent(JSON.stringify(dispInfo)) : '';
       div.innerHTML = `
         <div>
           <strong>${u.nome || ''} ${u.cognome || ''}</strong> ${badgeDisp}<br>
           <small>Matricola: ${u.matricola || 'N/A'}</small>
         </div>
-        <button class="btn">Seleziona</button>
+        <button class="btn" data-matricola="${String(u.matricola).trim()}" data-dispinfo="${dispInfoAttr}">Seleziona</button>
       `;
-      div.onclick = () => selectVolunteerForSlot(u, dispInfo);
+      div.querySelector('button').addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectVolunteerForSlot(u, dispInfo || null);
+      });
       modalVolunteersList.appendChild(div);
     });
   }
